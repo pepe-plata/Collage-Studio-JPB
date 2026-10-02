@@ -97,6 +97,13 @@ body {
 .side-menu li:hover { background: #f8fafc; border-left-color: var(--primary); }
 .side-menu li.active { background: #e0e7ff; border-left-color: var(--primary); font-weight: 600; }
 
+.side-menu li .menu-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
 /* ===== WORKSPACE ===== */
 .workspace {
   flex: 1;
