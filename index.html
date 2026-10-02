@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="description" content="Collage Studio JPB">
+  <title>🎨 Collage Studio JPB</title>
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🎨%3C/text%3E%3C/svg%3E">
+
+  <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="app-header">
+    <div class="header-left">
+      <button id="btnMenu" class="icon-btn" title="Menú">☰</button>
+      <h1>🎨 Collage Studio JPB</h1>
+    </div>
+    <div class="header-actions">
+      <button id="btnUndo" class="icon-btn" title="Deshacer (Ctrl+Z)">↶</button>
+      <button id="btnRedo" class="icon-btn" title="Rehacer (Ctrl+Y)">↷</button>
+    </div>
+  </header>
+
+  <!-- MENÚ LATERAL -->
+  <nav class="side-menu" id="sideMenu">
+    <div class="side-menu-header">
+      <span>Herramientas</span>
+    </div>
+    <ul>
+      <li data-panel="formato">📐 Formato</li>
+      <li data-panel="fondo">🖼️ Fondo</li>
+      <li data-panel="imagenes">📷 Insertar Imágenes...</li>
+      <li data-panel="figuras">🔷 Figuras</li>
+      <li data-panel="stickers">⭐ Stickers</li>
+      <li data-panel="vector">🎨 Vectores</li>
+      <li data-panel="texto">📝 Texto</li>
+      <li data-panel="efectos">✨ Efectos</li>
+      <li data-panel="filtros">🎞️ Filtros</li>
+      <li data-panel="papel">📜 Papel</li>
+      <li data-panel="mascaras">🎭 Máscaras</li>
+      <li data-panel="proyecto">💾 Proyecto</li>
+      <li data-panel="exportar">📤 Exportar</li>
+    </ul>
+  </nav>
+
+  <!-- WORKSPACE -->
+  <main class="workspace" id="workspace">
+    <div class="canvas-wrapper" id="canvasWrapper">
+      <canvas id="c"></canvas>
+    </div>
+  </main>
+
+  <!-- BARRA FLOTANTE -->
+  <div class="floating-bar" id="floatingBar">
+    <div class="floating-bar-handle" id="dragHandle">⋮⋮</div>
+    <div class="floating-bar-actions">
+      <button data-action="duplicar" title="Duplicar (Ctrl+D)">
+        <img src="icons/duplicate.png" alt="">
+        <span>Duplicar</span>
+      </button>
+      <button data-action="borrar" title="Borrar (Supr)">
+        <img src="icons/delete.png" alt="">
+        <span>Borrar</span>
+      </button>
+      <button data-action="frente" title="Al frente">
+        <img src="icons/sendfront.png" alt="">
+        <span>Frente</span>
+      </button>
+      <button data-action="atras" title="Al fondo">
+        <img src="icons/sendback.png" alt="">
+        <span>Fondo</span>
+      </button>
+      <button data-action="centrar" title="Centrar">
+        <img src="icons/center.png" alt="">
+        <span>Centrar</span>
+      </button>
+      <button data-action="rotar-izq" title="Rotar -90°">
+        <img src="icons/rotate-left.png" alt="">
+        <span>Rotar ↺</span>
+      </button>
+      <button data-action="rotar-der" title="Rotar +90°">
+        <img src="icons/rotate-right.png" alt="">
+        <span>Rotar ↻</span>
+      </button>
+      <button data-action="voltear-h" title="Voltear H">
+        <img src="icons/fliphorizontal.png" alt="">
+        <span>Voltear H</span>
+      </button>
+      <button data-action="voltear-v" title="Voltear V">
+        <img src="icons/flipvertical.png" alt="">
+        <span>Voltear V</span>
+      </button>
+      <button data-action="bloquear" title="Bloquear">
+        <img src="icons/padlock.png" alt="">
+        <span>Bloquear</span>
+      </button>
+      <button data-action="recortar" title="Recortar">
+        <img src="icons/scissors.png" alt="">
+        <span>Recortar</span>
+      </button>
+      <button data-action="zoom-out" title="Zoom -">
+        <img src="icons/zoomout.png" alt="">
+        <span>Zoom -</span>
+      </button>
+      <button data-action="zoom-in" title="Zoom +">
+        <img src="icons/zoomin.png" alt="">
+        <span>Zoom +</span>
+      </button>
+      <button data-action="zoom-reset" title="Reset zoom">
+        <img src="icons/resetzoom.png" alt="">
+        <span>Reset</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- PANEL LATERAL DERECHO -->
+  <aside class="panel" id="panel">
+    <div class="panel-header">
+      <h2 id="panelTitle">Panel</h2>
+      <button id="btnCerrarPanel" class="icon-btn">✕</button>
+    </div>
+    <div class="panel-content" id="panelContent"></div>
+  </aside>
+
+  <!-- MODAL DE RECORTE -->
+  <div class="modal" id="cropModal">
+    <div class="modal-content">
+      <h3>✂️ Recortar imagen</h3>
+      <canvas id="cropCanvas"></canvas>
+      <div class="modal-actions">
+        <button class="btn secondary" id="cropCancel">Cancelar</button>
+        <button class="btn success" id="cropApply">Aplicar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay"></div>
+
+  <script type="module" src="js/main.js"></script>
+
+</body>
+</html>
