@@ -1,6 +1,3 @@
-# Collage-Studio-JPB
-Herramienta para para Crear Collage de Imagenes
-
 # 🎨 Collage Studio JPB
 
 Una **PWA** (Progressive Web App) para crear collages, posters y álbumes de fotos directamente desde el navegador, sin backend y sin subir archivos a ningún servidor. Todo el procesamiento ocurre **localmente** en tu dispositivo.
