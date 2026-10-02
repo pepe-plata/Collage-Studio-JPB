@@ -46,6 +46,7 @@
       <li data-panel="mascaras">🎭 Máscaras</li>
       <li data-panel="proyecto">💾 Proyecto</li>
       <li data-panel="exportar">📤 Exportar</li>
+	  <li data-panel="ayuda">ℹ️ Ayuda</li>
     </ul>
   </nav>
 
@@ -60,63 +61,63 @@
   <div class="floating-bar" id="floatingBar">
     <div class="floating-bar-handle" id="dragHandle">⋮⋮</div>
     <div class="floating-bar-actions">
-      <button data-action="duplicar" title="Duplicar (Ctrl+D)">
-        <img src="icons/duplicate.png" alt="">
-        <span>Duplicar</span>
-      </button>
-      <button data-action="borrar" title="Borrar (Supr)">
-        <img src="icons/delete.png" alt="">
-        <span>Borrar</span>
-      </button>
-      <button data-action="frente" title="Al frente">
-        <img src="icons/sendfront.png" alt="">
-        <span>Frente</span>
-      </button>
-      <button data-action="atras" title="Al fondo">
-        <img src="icons/sendback.png" alt="">
-        <span>Fondo</span>
-      </button>
-      <button data-action="centrar" title="Centrar">
-        <img src="icons/center.png" alt="">
-        <span>Centrar</span>
-      </button>
-      <button data-action="rotar-izq" title="Rotar -90°">
-        <img src="icons/rotate-left.png" alt="">
-        <span>Rotar ↺</span>
-      </button>
-      <button data-action="rotar-der" title="Rotar +90°">
-        <img src="icons/rotate-right.png" alt="">
-        <span>Rotar ↻</span>
-      </button>
-      <button data-action="voltear-h" title="Voltear H">
-        <img src="icons/fliphorizontal.png" alt="">
-        <span>Voltear H</span>
-      </button>
-      <button data-action="voltear-v" title="Voltear V">
-        <img src="icons/flipvertical.png" alt="">
-        <span>Voltear V</span>
-      </button>
-      <button data-action="bloquear" title="Bloquear">
-        <img src="icons/padlock.png" alt="">
-        <span>Bloquear</span>
-      </button>
-      <button data-action="recortar" title="Recortar">
-        <img src="icons/scissors.png" alt="">
-        <span>Recortar</span>
-      </button>
-      <button data-action="zoom-out" title="Zoom -">
-        <img src="icons/zoomout.png" alt="">
-        <span>Zoom -</span>
-      </button>
-      <button data-action="zoom-in" title="Zoom +">
-        <img src="icons/zoomin.png" alt="">
-        <span>Zoom +</span>
-      </button>
-      <button data-action="zoom-reset" title="Reset zoom">
-        <img src="icons/resetzoom.png" alt="">
-        <span>Reset</span>
-      </button>
-    </div>
+	  <button data-action="borrar" title="Eliminar (Supr)">
+		<img src="icons/delete.png" alt="">
+		<span>Eliminar</span>
+	  </button>
+	  <button data-action="duplicar" title="Duplicar (Ctrl+D)">
+		<img src="icons/duplicate.png" alt="">
+		<span>Duplicar</span>
+	  </button>
+	  <button data-action="frente" title="Al frente">
+		<img src="icons/sendfront.png" alt="">
+		<span>Frente</span>
+	  </button>
+	  <button data-action="atras" title="Al fondo">
+		<img src="icons/sendback.png" alt="">
+		<span>Fondo</span>
+	  </button>
+	  <button data-action="recortar" title="Recortar">
+		<img src="icons/scissors.png" alt="">
+		<span>Recortar</span>
+	  </button>
+	  <button data-action="rotar-izq" title="Rotar -90°">
+		<img src="icons/rotate-left.png" alt="">
+		<span>Rotar ↺</span>
+	  </button>
+	  <button data-action="rotar-der" title="Rotar +90°">
+		<img src="icons/rotate-right.png" alt="">
+		<span>Rotar ↻</span>
+	  </button>
+	  <button data-action="voltear-h" title="Voltear H">
+		<img src="icons/fliphorizontal.png" alt="">
+		<span>Voltear H</span>
+	  </button>
+	  <button data-action="voltear-v" title="Voltear V">
+		<img src="icons/flipvertical.png" alt="">
+		<span>Voltear V</span>
+	  </button>
+	  <button data-action="centrar" title="Centrar">
+		<img src="icons/center.png" alt="">
+		<span>Centrar</span>
+	  </button>
+	  <button data-action="bloquear" title="Bloquear">
+		<img src="icons/padlock.png" alt="">
+		<span>Bloquear</span>
+	  </button>
+	  <button data-action="zoom-out" title="Zoom -">
+		<img src="icons/zoomout.png" alt="">
+		<span>Zoom -</span>
+	  </button>
+	  <button data-action="zoom-in" title="Zoom +">
+		<img src="icons/zoomin.png" alt="">
+		<span>Zoom +</span>
+	  </button>
+	  <button data-action="zoom-reset" title="Reset zoom">
+		<img src="icons/resetzoom.png" alt="">
+		<span>Reset</span>
+	  </button>
+	</div>
   </div>
 
   <!-- PANEL LATERAL DERECHO -->
