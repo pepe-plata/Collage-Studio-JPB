@@ -126,10 +126,18 @@ function applyZoomToWrapper() {
   const container = wrapper.querySelector('.canvas-container');
   if (!container) return;
 
-  wrapper.style.transform = `scale(${currentZoom})`;
-  wrapper.style.transformOrigin = 'top center';
+  // ✅ Usar "zoom" en lugar de "transform: scale"
+  // El zoom afecta al layout (no solo visual), así que:
+  // - El centrado con margin auto funciona
+  // - Las barras de scroll aparecen correctamente
+  // - El canvas se re-centra al hacer zoom
+  wrapper.style.zoom = currentZoom;
+
+  // Ajustar tamaño del wrapper para que el scroll funcione
   wrapper.style.width = (container.offsetWidth * currentZoom) + 'px';
   wrapper.style.height = (container.offsetHeight * currentZoom) + 'px';
+
+  // ✅ Centrado horizontal con margin auto
   wrapper.style.margin = '0 auto';
 
   updateCanvasInfo();

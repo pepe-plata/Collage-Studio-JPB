@@ -73,14 +73,94 @@ window.addEventListener('DOMContentLoaded', () => {
   // Historial
   HIST.initHistory();
 
-  // Service Worker
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-    navigator.serviceWorker.register('./sw.js')
-      .then(() => console.log('✅ SW registrado'))
-      .catch(err => console.log('⚠️ SW error:', err));
-  }
+  // ===== SERVICE WORKER con auto-update =====
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('./sw.js').then((reg) => {
+    console.log('✅ SW registrado');
+
+    // Buscar actualizaciones cada 30 segundos
+    setInterval(() => reg.update(), 30 * 1000);
+
+    // Cuando hay una nueva versión, activarla
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          // Hay nueva versión → recargar
+          console.log('🔄 Nueva versión disponible, recargando...');
+          newWorker.postMessage('skipWaiting');
+          setTimeout(() => location.reload(), 300);
+        }
+      });
+    });
+  }).catch(err => console.log('⚠️ SW error:', err));
+
+  // Si el SW cambia de controlador, recargar
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    location.reload();
+  });
+}
 
   console.log('✅ App lista');
+});
+  // ===== BOTÓN ATRÁS DE ANDROID =====
+let hayCambiosSinGuardar = false;
+let proyectoGuardado = false;
+
+// Marcar cambios cuando se modifica el canvas
+CV.canvas.on('object:added', () => hayCambiosSinGuardar = true);
+CV.canvas.on('object:modified', () => hayCambiosSinGuardar = true);
+CV.canvas.on('object:removed', () => hayCambiosSinGuardar = true);
+
+// Resetear cuando se guarda/carga
+window.addEventListener('proyecto:guardado', () => {
+  hayCambiosSinGuardar = false;
+  proyectoGuardado = true;
+});
+window.addEventListener('proyecto:cargado', () => {
+  hayCambiosSinGuardar = false;
+});
+
+// Interceptar el botón atrás
+history.pushState({ page: 'collage' }, '', location.href);
+
+window.addEventListener('popstate', (e) => {
+  if (hayCambiosSinGuardar) {
+    // Volver a empujar para que no salga aún
+    history.pushState({ page: 'collage' }, '', location.href);
+
+    // Preguntar
+    const quiere = confirm(
+      '⚠️ Tienes cambios sin guardar.\n\n' +
+      '¿Quieres guardarlos antes de salir?\n\n' +
+      'Aceptar = Guardar y salir\n' +
+      'Cancelar = Salir sin guardar'
+    );
+
+    if (quiere) {
+      // Guardar
+      import('./project.js').then(PROJ => {
+        PROJ.saveProject();
+        setTimeout(() => {
+          if (confirm('Proyecto guardado. ¿Salir ahora?')) {
+            window.removeEventListener('popstate', () => {});
+            history.back();
+          }
+        }, 300);
+      });
+    } else {
+      // Salir sin guardar
+      if (confirm('¿Seguro que quieres salir sin guardar los cambios?')) {
+        history.back();
+      }
+    }
+  } else {
+    // Sin cambios: salir
+    history.back();
+  }
 });
 
 function bindKeyboard() {

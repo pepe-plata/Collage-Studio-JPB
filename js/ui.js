@@ -52,7 +52,8 @@ function getPanelTitle(name) {
     papel: '📜 Efectos de papel',
     mascaras: '🎭 Máscaras',
     proyecto: '💾 Proyecto',
-    exportar: '📤 Exportar'
+    exportar: '📤 Exportar',
+	ayuda: '️ℹ️ Ayuda'
   }[name] || 'Panel';
 }
 
@@ -293,6 +294,13 @@ function getPanelContent(name) {
         <button class="btn" id="btnExportPDF">📄 Descargar PDF</button>
         <button class="btn secondary" id="btnCompartir">📤 Compartir</button>
       `;
+	  
+	 case 'ayuda':
+	  return `
+		<div id="ayudaContenido" style="font-size:0.85rem; line-height:1.6;">
+		  <p>Cargando ayuda...</p>
+		</div>
+	  `;
 
     default:
       return '';
@@ -514,6 +522,17 @@ function bindPanelEvents(name) {
       }
     };
   }
+
+  if (name === 'ayuda') {
+	  fetch('./README.md')
+		.then(r => r.text())
+		.then(md => {
+		  document.getElementById('ayudaContenido').innerHTML = renderMarkdown(md);
+		})
+		.catch(() => {
+		  document.getElementById('ayudaContenido').innerHTML = '<p>No se pudo cargar la ayuda.</p>';
+		});
+  }
 }
 
 function download(dataURL, filename) {
@@ -603,4 +622,48 @@ export function makeBarDraggable() {
   document.addEventListener('touchmove', onMove, { passive: false });
   document.addEventListener('mouseup', onEnd);
   document.addEventListener('touchend', onEnd);
+}
+
+// ===== Mini renderizador de Markdown =====
+function renderMarkdown(md) {
+  // Escapar HTML
+  let html = md
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // Código en bloque ```
+  html = html.replace(/```([\s\S]*?)```/g, (m, code) =>
+    `<pre style="background:#f1f5f9; padding:0.6rem; border-radius:6px; overflow:auto; font-size:0.75rem;"><code>${code.trim()}</code></pre>`
+  );
+
+  // Encabezados
+  html = html.replace(/^###### (.*)$/gm, '<h6>$1</h6>');
+  html = html.replace(/^##### (.*)$/gm, '<h5>$1</h5>');
+  html = html.replace(/^#### (.*)$/gm, '<h4>$1</h4>');
+  html = html.replace(/^### (.*)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.*)$/gm, '<h2 style="margin:1rem 0 0.5rem;">$1</h2>');
+  html = html.replace(/^# (.*)$/gm, '<h1 style="margin:1rem 0 0.5rem; font-size:1.1rem;">$1</h1>');
+
+  // Negrita, cursiva, código inline
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  html = html.replace(/`(.+?)`/g, '<code style="background:#f1f5f9; padding:0.1rem 0.3rem; border-radius:4px;">$1</code>');
+
+  // Enlaces
+  html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" style="color:var(--primary);">$1</a>');
+
+  // Listas
+  html = html.replace(/^\s*[-*] (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul style="margin:0.5rem 0 0.5rem 1rem;">${m}</ul>`);
+
+  // Checkbox
+  html = html.replace(/\[ \] (.+)/g, '☐ $1');
+  html = html.replace(/\[x\] (.+)/gi, '☑ $1');
+
+  // Saltos de línea
+  html = html.replace(/\n\n/g, '</p><p style="margin:0.5rem 0;">');
+  html = html.replace(/\n/g, '<br>');
+
+  return `<p style="margin:0.5rem 0;">${html}</p>`;
 }
