@@ -12,7 +12,7 @@
   --success: #16a34a;
   --border: #e2e8f0;
   --shadow: 0 4px 12px rgba(0,0,0,0.08);
-  --workspace-bg: rgb(227, 228, 232);  /* ✅ NUEVO color de fondo */
+  --workspace-bg: rgb(227, 228, 232);
 }
 
 html, body {
@@ -122,26 +122,36 @@ body {
 .side-menu li.active { background: #e0e7ff; border-left-color: var(--primary); font-weight: 600; }
 .side-menu li .menu-icon { width: 18px; height: 18px; object-fit: contain; flex-shrink: 0; }
 
-/* ===== WORKSPACE (FONDO SÓLIDO) ===== */
+/* ===== WORKSPACE (FIX CENTRADO) ===== */
 .workspace {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 0;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  background-color: var(--workspace-bg);  /* ✅ Fondo sólido RGB(227,228,232) */
-  overflow-x: auto;
-  overflow-y: auto;
+  background-color: var(--workspace-bg);
   position: relative;
+  /* ✅ text-align center para centrar el hijo inline-block */
+  text-align: center;
+  /* El scroll lo maneja el propio workspace */
+}
+
+/* ✅ Área de scroll interna que ocupa al menos el 100% */
+.canvas-scroll-area {
+  display: inline-block;       /* ✅ se ajusta al ancho del contenido */
+  min-width: 100%;             /* ✅ pero al menos ocupa todo el ancho */
+  padding: 20px;
+  vertical-align: top;
+  /* Asegurar que el contenido esté centrado cuando es más pequeño */
+  text-align: center;
+  /* Pero que el scroll funcione cuando es más grande */
+  white-space: nowrap;
 }
 
 .canvas-wrapper {
+  display: inline-block;       /* ✅ inline-block para centrado con text-align */
   position: relative;
-  flex-shrink: 0;
-  /* ✅ Margen para que el canvas respire sin considerar la barra flotante */
-  margin: 20px auto;
+  vertical-align: top;
+  /* ✅ El margen vertical para que respire */
+  margin: 0;
 }
 
 .canvas-container {
@@ -152,37 +162,23 @@ body {
 
 canvas { touch-action: none; }
 
-/* ===== BARRA FLOTANTE ===== */
+/* ===== BARRA FLOTANTE (SIN HANDLE) ===== */
 .floating-bar {
   position: fixed;
-  bottom: 20px;
+  bottom: 15px;
   left: 50%;
   transform: translateX(-50%);
   background: white;
   border-radius: 12px;
   box-shadow: 0 8px 30px rgba(0,0,0,0.25);
-  display: flex;
-  flex-direction: column;
   z-index: 80;
   user-select: none;
   max-width: calc(100vw - 20px);
 }
-.floating-bar.dragging { box-shadow: 0 12px 40px rgba(79,70,229,0.4); }
-.floating-bar-handle {
-  background: var(--primary);
-  color: white;
-  text-align: center;
-  font-size: 0.85rem;
-  padding: 0.2rem 0;
-  border-radius: 12px 12px 0 0;
-  cursor: grab;
-  letter-spacing: 3px;
-}
-.floating-bar-handle:active { cursor: grabbing; }
 .floating-bar-actions {
   display: flex;
   gap: 0.15rem;
-  padding: 0.3rem;
+  padding: 0.35rem;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -219,17 +215,17 @@ canvas { touch-action: none; }
 /* ===== OVERLAY DE DIMENSIONES ===== */
 .dimension-overlay {
   position: fixed;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.8);
   color: white;
   font-size: 0.75rem;
   font-weight: 600;
-  padding: 0.25rem 0.55rem;
+  padding: 0.3rem 0.6rem;
   border-radius: 6px;
   pointer-events: none;
-  z-index: 60;
+  z-index: 9999;
   white-space: nowrap;
-  transform: translate(-50%, -50%);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  transform: translate(-50%, -100%);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
 .dimension-overlay.hidden { display: none; }
 
