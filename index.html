@@ -17,12 +17,10 @@
 </head>
 <body>
 
-  <!-- SPLASH -->
   <div class="splash" id="splash">
     <img src="icons/icon-512.png" alt="Collage Studio JPB">
   </div>
 
-  <!-- HEADER -->
   <header class="app-header">
     <div class="header-left">
       <button id="btnMenu" class="icon-btn" title="Menú">☰</button>
@@ -35,7 +33,6 @@
     </div>
   </header>
 
-  <!-- MENÚ LATERAL -->
   <nav class="side-menu" id="sideMenu">
     <div class="side-menu-header">
       <span>Herramientas</span>
@@ -59,16 +56,16 @@
     </ul>
   </nav>
 
-  <!-- WORKSPACE -->
   <main class="workspace" id="workspace">
-    <div class="canvas-wrapper" id="canvasWrapper">
-      <canvas id="c"></canvas>
+    <div class="canvas-scroll-area" id="canvasScrollArea">
+      <div class="canvas-wrapper" id="canvasWrapper">
+        <canvas id="c"></canvas>
+      </div>
     </div>
   </main>
 
-  <!-- BARRA FLOTANTE -->
+  <!-- BARRA FLOTANTE (sin handle morado) -->
   <div class="floating-bar" id="floatingBar">
-    <div class="floating-bar-handle" id="dragHandle">⋮⋮</div>
     <div class="floating-bar-actions">
       <button data-action="borrar" title="Eliminar (Supr)">
         <img src="icons/delete.png" alt="">
@@ -137,7 +134,6 @@
     </div>
   </div>
 
-  <!-- PANEL DERECHO -->
   <aside class="panel" id="panel">
     <div class="panel-header">
       <h2 id="panelTitle">Panel</h2>
@@ -146,7 +142,6 @@
     <div class="panel-content" id="panelContent"></div>
   </aside>
 
-  <!-- MODAL DE RECORTE -->
   <div class="modal" id="cropModal">
     <div class="modal-content">
       <h3>✂️ Recortar imagen</h3>
