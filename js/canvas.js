@@ -25,35 +25,22 @@ export let currentZoom = 1;
 
 let dimensionOverlay = null;
 
-// Estado interno de interacciones
-const S = {
-  mode: 'idle', // 'idle' | 'panning' | 'dragging' | 'pinching'
-  startX: 0, startY: 0,
-  startScrollLeft: 0, startScrollTop: 0,
-  dragObj: null, dragStartLeft: 0, dragStartTop: 0,
-  pinchStartDist: 0, pinchStartZoom: 1
-};
-
 // ===== INIT =====
 export function initCanvas() {
   canvas = new fabric.Canvas('c', {
     backgroundColor: '#ffffff',
     preserveObjectStacking: true,
-    selection: false,
-    interactive: false,        // ✅ CLAVE: desactivar interacción interna
-    skipTargetFind: false,
-    fireRightClick: false,
-    stopContextMenu: true
+    selection: true
   });
 
   initOverlay();
-  initEvents();
+  initFabricEvents();
 
   setSheetSize('Carta');
   return canvas;
 }
 
-// ===== OVERLAY (anclado dentro del objeto, parte inferior) =====
+// ===== OVERLAY =====
 function initOverlay() {
   dimensionOverlay = document.getElementById('dimensionOverlay');
   if (!dimensionOverlay) {
@@ -72,21 +59,17 @@ export function updateDimensionOverlay() {
     return;
   }
 
-  // Tamaño en cm
   const wCm = (obj.width * obj.scaleX) / PX_PER_CM;
   const hCm = (obj.height * obj.scaleY) / PX_PER_CM;
   dimensionOverlay.textContent = `${wCm.toFixed(2)} × ${hCm.toFixed(2)} cm`;
   dimensionOverlay.classList.remove('hidden');
 
-  // ✅ Posicionar en la parte INFERIOR INTERNA del objeto:
-  //    - Centro horizontal del objeto
-  //    - Borde inferior del objeto menos un pequeño offset (queda "dentro")
   const canvasEl = canvas.upperCanvasEl;
   const canvasRect = canvasEl.getBoundingClientRect();
   const objRect = obj.getBoundingRect(true, true);
 
-  const centerX = canvasRect.left + (objRect.left + objRect.width / 2) * currentZoom;
-  const bottomY = canvasRect.top + (objRect.top + objRect.height) * currentZoom - 6; // 6px dentro
+  const centerX = canvasRect.left + objRect.left + objRect.width / 2;
+  const bottomY = canvasRect.top + objRect.top + objRect.height - 6;
 
   dimensionOverlay.style.left = centerX + 'px';
   dimensionOverlay.style.top = bottomY + 'px';
@@ -96,187 +79,26 @@ export function hideDimensionOverlay() {
   if (dimensionOverlay) dimensionOverlay.classList.add('hidden');
 }
 
-// ===== EVENTOS (Canva-style) =====
-function initEvents() {
-  const upper = canvas.upperCanvasEl;
-  const workspace = document.getElementById('workspace');
-
-  // ===== POINTER DOWN (mouse y touch) =====
-  upper.addEventListener('pointerdown', (e) => {
-    if (S.mode === 'pinching') return;
-
-    S.startX = e.clientX;
-    S.startY = e.clientY;
-
-    const target = findObjectAt(e.clientX, e.clientY);
-
-    if (target) {
-      // Hay objeto debajo
-      const alreadySelected = canvas.getActiveObject() === target;
-      canvas.setActiveObject(target);
-      canvas.renderAll();
-      updateDimensionOverlay();
-
-      // Si ya estaba seleccionado → arrastrar
-      if (alreadySelected) {
-        S.mode = 'dragging';
-        S.dragObj = target;
-        S.dragStartLeft = target.left;
-        S.dragStartTop = target.top;
-      } else {
-        S.mode = 'idle';
-      }
-    } else {
-      // Fondo → paneo
-      S.mode = 'panning';
-      S.startScrollLeft = workspace.scrollLeft;
-      S.startScrollTop = workspace.scrollTop;
-      canvas.discardActiveObject();
-      canvas.renderAll();
-      hideDimensionOverlay();
-      upper.style.cursor = 'grabbing';
-    }
-
-    upper.setPointerCapture(e.pointerId);
-  });
-
-  // ===== POINTER MOVE =====
-  upper.addEventListener('pointermove', (e) => {
-    if (S.mode === 'panning') {
-      const dx = e.clientX - S.startX;
-      const dy = e.clientY - S.startY;
-      workspace.scrollLeft = S.startScrollLeft - dx;
-      workspace.scrollTop = S.startScrollTop - dy;
-    } else if (S.mode === 'dragging' && S.dragObj) {
-      const dx = (e.clientX - S.startX) / currentZoom;
-      const dy = (e.clientY - S.startY) / currentZoom;
-      S.dragObj.set({
-        left: S.dragStartLeft + dx,
-        top: S.dragStartTop + dy
-      });
-      S.dragObj.setCoords();
-      canvas.renderAll();
-      updateDimensionOverlay();
-    }
-  });
-
-  // ===== POINTER UP =====
-  upper.addEventListener('pointerup', (e) => {
-    if (S.mode === 'dragging' && S.dragObj) {
-      canvas.fire('object:modified', { target: S.dragObj });
-    }
-    S.mode = 'idle';
-    S.dragObj = null;
-    upper.style.cursor = 'default';
-  });
-
-  upper.addEventListener('pointercancel', () => {
-    S.mode = 'idle';
-    S.dragObj = null;
-    upper.style.cursor = 'default';
-  });
-
-  // ===== WHEEL con SHIFT (zoom) =====
-  workspace.addEventListener('wheel', (e) => {
-    if (e.shiftKey) {
-      e.preventDefault();
-      const rect = workspace.getBoundingClientRect();
-      const fx = e.clientX - rect.left;
-      const fy = e.clientY - rect.top;
-      const newZoom = e.deltaY > 0 ? currentZoom - 0.1 : currentZoom + 0.1;
-      zoomAtPoint(newZoom, fx, fy);
-    }
-  }, { passive: false });
-
-  // ===== PINCH ZOOM =====
-  let pinchStartDist = 0;
-  let pinchStartZoom = 1;
-  let pinchFocalX = 0;
-  let pinchFocalY = 0;
-
-  upper.addEventListener('touchstart', (e) => {
-    if (e.touches.length === 2) {
-      e.preventDefault();
-      S.mode = 'pinching';
-      const [a, b] = e.touches;
-      pinchStartDist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-      pinchStartZoom = currentZoom;
-      const rect = workspace.getBoundingClientRect();
-      pinchFocalX = (a.clientX + b.clientX) / 2 - rect.left;
-      pinchFocalY = (a.clientY + b.clientY) / 2 - rect.top;
-    }
-  }, { passive: false });
-
-  upper.addEventListener('touchmove', (e) => {
-    if (e.touches.length === 2 && S.mode === 'pinching') {
-      e.preventDefault();
-      const [a, b] = e.touches;
-      const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-      const scale = dist / pinchStartDist;
-      const newZoom = Math.max(0.1, Math.min(pinchStartZoom * scale, 5));
-      zoomAtPoint(newZoom, pinchFocalX, pinchFocalY);
-    }
-  }, { passive: false });
-
-  upper.addEventListener('touchend', (e) => {
-    if (e.touches.length < 2) S.mode = 'idle';
-  });
-}
-
-// ✅ Encontrar objeto en coordenadas de pantalla (compensando scroll y zoom)
-function findObjectAt(clientX, clientY) {
-  const rect = canvas.upperCanvasEl.getBoundingClientRect();
-  const x = (clientX - rect.left) / currentZoom;
-  const y = (clientY - rect.top) / currentZoom;
-
-  const objects = canvas.getObjects();
-  for (let i = objects.length - 1; i >= 0; i--) {
-    const obj = objects[i];
-    if (!obj.selectable) continue;
-    if (obj.containsPoint(new fabric.Point(x, y))) return obj;
-  }
-  return null;
+// ===== EVENTOS FABRIC =====
+function initFabricEvents() {
+  canvas.on('selection:created', updateDimensionOverlay);
+  canvas.on('selection:updated', updateDimensionOverlay);
+  canvas.on('selection:cleared', hideDimensionOverlay);
+  canvas.on('object:moving', updateDimensionOverlay);
+  canvas.on('object:scaling', updateDimensionOverlay);
+  canvas.on('object:rotating', updateDimensionOverlay);
+  canvas.on('object:modified', updateDimensionOverlay);
 }
 
 // ===== ZOOM =====
-function zoomAtPoint(newZoom, focalX, focalY) {
-  newZoom = Math.max(0.1, Math.min(newZoom, 5));
-  const workspace = document.getElementById('workspace');
-  const wrapper = document.getElementById('canvasWrapper');
-  if (!workspace || !wrapper) return;
-
-  const oldZoom = currentZoom;
-  if (Math.abs(newZoom - oldZoom) < 0.001) return;
-
-  // Ajustar scroll para mantener el punto focal fijo
-  const scrollX = workspace.scrollLeft;
-  const scrollY = workspace.scrollTop;
-  const ratio = newZoom / oldZoom;
-
-  currentZoom = newZoom;
-  applyZoomVisual();
-
-  workspace.scrollLeft = (scrollX + focalX) * ratio - focalX;
-  workspace.scrollTop = (scrollY + focalY) * ratio - focalY;
-
-  updateCanvasInfo();
-  updateDimensionOverlay();
-}
-
 export function zoomIn() {
-  const ws = document.getElementById('workspace');
-  zoomAtPoint(currentZoom * 1.15, ws.clientWidth / 2, ws.clientHeight / 2);
+  currentZoom = Math.min(currentZoom * 1.15, 5);
+  applyZoom();
 }
-
 export function zoomOut() {
-  const ws = document.getElementById('workspace');
-  zoomAtPoint(currentZoom / 1.15, ws.clientWidth / 2, ws.clientHeight / 2);
+  currentZoom = Math.max(currentZoom / 1.15, 0.1);
+  applyZoom();
 }
-
-export function zoomReset() {
-  zoomFitToScreen();
-}
-
 export function zoomFitToScreen() {
   const ws = document.getElementById('workspace');
   if (!ws) return;
@@ -284,32 +106,55 @@ export function zoomFitToScreen() {
   const availH = ws.clientHeight - 40;
   const fit = Math.min(availW / canvas.width, availH / canvas.height, 1);
   currentZoom = Math.max(fit, 0.1);
-  applyZoomVisual();
-  ws.scrollLeft = 0;
-  ws.scrollTop = 0;
+  applyZoom();
+}
+export function zoomReset() { zoomFitToScreen(); }
+export function setZoom(z) {
+  currentZoom = Math.max(0.1, Math.min(z, 5));
+  applyZoom();
+}
+
+// ===== APLICAR ZOOM (usa zoom CSS que sí funciona bien con botones) =====
+function applyZoom() {
+  const wrapper = document.getElementById('canvasWrapper');
+  const workspace = document.getElementById('workspace');
+  if (!wrapper || !workspace) return;
+
+  // Guardar el centro visible actual
+  const centerX = workspace.scrollLeft + workspace.clientWidth / 2;
+  const centerY = workspace.scrollTop + workspace.clientHeight / 2;
+
+  wrapper.style.zoom = currentZoom;
+  wrapper.style.width = (canvas.width * currentZoom) + 'px';
+  wrapper.style.height = (canvas.height * currentZoom) + 'px';
+  wrapper.style.margin = '20px auto';
+
+  // Restaurar el centro (compensando el nuevo tamaño)
+  requestAnimationFrame(() => {
+    workspace.scrollLeft = centerX * currentZoom - workspace.clientWidth / 2;
+    workspace.scrollTop = centerY * currentZoom - workspace.clientHeight / 2;
+  });
+
   updateCanvasInfo();
   updateDimensionOverlay();
 }
 
-export function setZoom(z) {
-  currentZoom = Math.max(0.1, Math.min(z, 5));
-  applyZoomVisual();
+// ===== PAN =====
+export function panUp() {
+  const ws = document.getElementById('workspace');
+  ws.scrollBy({ top: -150, behavior: 'smooth' });
 }
-
-// ✅ Aplicar zoom visual SOLO al wrapper (con transform, no con zoom CSS)
-function applyZoomVisual() {
-  const wrapper = document.getElementById('canvasWrapper');
-  if (!wrapper) return;
-  // NO usar zoom CSS porque rompe el centrado en Android.
-  // En su lugar, redimensionar el wrapper con transform scale.
-  wrapper.style.transform = `scale(${currentZoom})`;
-  wrapper.style.transformOrigin = 'top left';
-  // El tamaño del wrapper debe ser el original * zoom para que el scroll funcione
-  wrapper.style.width = (canvas.width * currentZoom) + 'px';
-  wrapper.style.height = (canvas.height * currentZoom) + 'px';
-  // Pero el contenido real es el canvas, así que hay que compensar con margen negativo
-  // Solución: usar un contenedor que mantenga el tamaño del canvas original y aplicar scale
-  // Mejor: NO usar scale, usar cambio de tamaño de canvas
+export function panDown() {
+  const ws = document.getElementById('workspace');
+  ws.scrollBy({ top: 150, behavior: 'smooth' });
+}
+export function panLeft() {
+  const ws = document.getElementById('workspace');
+  ws.scrollBy({ left: -150, behavior: 'smooth' });
+}
+export function panRight() {
+  const ws = document.getElementById('workspace');
+  ws.scrollBy({ left: 150, behavior: 'smooth' });
 }
 
 // ===== INFO =====
@@ -323,9 +168,7 @@ export function updateCanvasInfo() {
   el.textContent = `${label} · Zoom ${Math.round(currentZoom * 100)}%`;
 }
 
-export function updateObjectInfo() {
-  updateDimensionOverlay();
-}
+export function updateObjectInfo() { updateDimensionOverlay(); }
 
 // ===== HANDLES =====
 function applyCanvaHandles(obj) {
@@ -356,9 +199,8 @@ export function setSheetSize(key, customSize = null) {
   const hPx = Math.round(currentSize.h * PX_PER_CM);
   canvas.setWidth(wPx);
   canvas.setHeight(hPx);
-  // Resetear zoom a fit
   currentZoom = 1;
-  applyZoomVisual();
+  applyZoom();
   setTimeout(() => zoomFitToScreen(), 50);
   canvas.renderAll();
   updateCanvasInfo();
@@ -480,7 +322,6 @@ export function setSolidBackground(color) {
   canvas.backgroundColor = color;
   canvas.renderAll();
 }
-
 export function setGradientBackground(c1, c2, tipo = 'linear-vertical') {
   canvas.backgroundColor = '';
   canvas.setBackgroundImage(null, () => {});
@@ -506,7 +347,6 @@ export function setGradientBackground(c1, c2, tipo = 'linear-vertical') {
   const rect = new fabric.Rect({ left: 0, top: 0, width: W, height: H, selectable: false, evented: false, fill: grad });
   canvas.setBackgroundImage(rect, canvas.renderAll.bind(canvas));
 }
-
 export function setImageBackground(dataURL) {
   const imgEl = new Image();
   imgEl.onload = () => {
@@ -518,13 +358,13 @@ export function setImageBackground(dataURL) {
   };
   imgEl.src = dataURL;
 }
-
 export function setTransparentBackground() {
   canvas.setBackgroundImage(null, () => {});
   canvas.backgroundColor = '';
   canvas.renderAll();
 }
 
+// ===== NUEVO =====
 export function newProject() {
   canvas.clear();
   canvas.backgroundColor = '#ffffff';
@@ -536,7 +376,7 @@ export function newProject() {
   canvas.setWidth(wPx);
   canvas.setHeight(hPx);
   currentZoom = 1;
-  applyZoomVisual();
+  applyZoom();
   setTimeout(() => zoomFitToScreen(), 50);
   canvas.renderAll();
   updateCanvasInfo();
@@ -618,7 +458,6 @@ export function setFillColor(color) {
   canvas.renderAll();
 }
 export function setOpacity(value) { const o = canvas.getActiveObject(); if (o) { o.set('opacity', value); canvas.renderAll(); } }
-
 export function toggleBold() { const o = canvas.getActiveObject(); if (o) { o.set('fontWeight', o.fontWeight === 'bold' ? 'normal' : 'bold'); canvas.renderAll(); } }
 export function toggleItalic() { const o = canvas.getActiveObject(); if (o) { o.set('fontStyle', o.fontStyle === 'italic' ? 'normal' : 'italic'); canvas.renderAll(); } }
 export function toggleUnderline() { const o = canvas.getActiveObject(); if (o) { o.set('underline', !o.underline); canvas.renderAll(); } }

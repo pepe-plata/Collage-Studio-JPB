@@ -41,18 +41,25 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnExportar').onclick = () => UI.openPanel('exportar');
 
   UI.bindActionBar();
+  UI.bindNavBar();  // ⭐ NUEVA
 
   bindKeyboard();
+
+  // Zoom con Shift + scroll
+  const workspace = document.getElementById('workspace');
+  workspace.addEventListener('wheel', (e) => {
+    if (e.shiftKey) {
+      e.preventDefault();
+      if (e.deltaY > 0) CV.zoomOut();
+      else CV.zoomIn();
+    }
+  }, { passive: false });
+
   document.getElementById('cropCancel').onclick = TOOLS.closeCropModal;
   document.getElementById('cropApply').onclick = TOOLS.applyCrop;
 
   CV.updateCanvasInfo();
   CV.updateObjectInfo();
-
-  CV.canvas.on('selection:created', CV.updateObjectInfo);
-  CV.canvas.on('selection:updated', CV.updateObjectInfo);
-  CV.canvas.on('selection:cleared', () => { CV.hideDimensionOverlay(); });
-  CV.canvas.on('object:modified', CV.updateObjectInfo);
 
   HIST.initHistory();
 

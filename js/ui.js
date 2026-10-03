@@ -1,5 +1,5 @@
 // ============================================
-// ui.js — Paneles, formularios, eventos
+// ui.js
 // ============================================
 
 import * as CV from './canvas.js';
@@ -15,6 +15,35 @@ export function openPanel(name) {
   const content = document.getElementById('panelContent');
   const overlay = document.getElementById('overlay');
   const sideMenu = document.getElementById('sideMenu');
+
+  // ✅ Manejo especial de "Nuevo"
+  if (name === 'nuevo') {
+    const quiere = confirm(
+      '¿Crear nuevo proyecto?\n\n' +
+      'Se eliminará todo el contenido actual.\n\n' +
+      'Aceptar = Nuevo proyecto\n' +
+      'Cancelar = Guardar cambios primero'
+    );
+    if (quiere) {
+      // Nuevo sin guardar
+      CV.newProject();
+      setTimeout(() => {
+        openPanel('formato');
+      }, 100);
+    } else {
+      // Guardar primero
+      import('./project.js').then(PROJ => {
+        PROJ.saveProject();
+        CV.newProject();
+        setTimeout(() => {
+          openPanel('formato');
+        }, 100);
+      });
+    }
+    sideMenu.classList.remove('open');
+    overlay.classList.remove('show');
+    return;
+  }
 
   activePanel = name;
   title.textContent = getPanelTitle(name);
@@ -40,8 +69,7 @@ export function closePanel() {
 
 function getPanelTitle(name) {
   return {
-    nuevo: '✨ Nuevo Proyecto',
-    formato: '📐 Cambiar Tamaño',
+    formato: '📐 Seleccionar tamaño de Lienzo',
     fondo: '🖼️ Fondo',
     imagenes: '📷 Insertar Imágenes',
     figuras: '🔷 Figuras geométricas',
@@ -60,22 +88,6 @@ function getPanelTitle(name) {
 
 function getPanelContent(name) {
   switch (name) {
-    case 'nuevo':
-      return `
-        <p style="font-size:0.9rem; margin-bottom:1rem;">
-          ¿Crear un nuevo proyecto? Se eliminará todo el contenido del canvas.
-        </p>
-        <button class="btn danger" id="btnConfirmNuevo">🗑️ Crear nuevo proyecto</button>
-        <hr style="margin:1rem 0; border:none; border-top:1px solid var(--border);">
-        <p style="font-size:0.85rem; font-weight:600; margin-bottom:0.5rem;">O elige un tamaño:</p>
-        <div id="nuevoTamaños">
-          ${Object.entries(CV.SHEET_SIZES).map(([key, s]) =>
-            `<button class="btn secondary" data-size="${key}">${s.label}</button>`
-          ).join('')}
-          <button class="btn secondary" data-size="Personalizado">📐 Personalizado...</button>
-        </div>
-      `;
-
     case 'formato':
       return `
         ${Object.entries(CV.SHEET_SIZES).map(([key, s]) =>
@@ -336,11 +348,7 @@ function getPanelContent(name) {
       `;
 
     case 'ayuda':
-      return `
-        <div id="ayudaContenido" style="font-size:0.85rem; line-height:1.6;">
-          <p>Cargando ayuda...</p>
-        </div>
-      `;
+      return `<div id="ayudaContenido" style="font-size:0.85rem; line-height:1.6;"><p>Cargando ayuda...</p></div>`;
 
     default:
       return '';
@@ -349,27 +357,6 @@ function getPanelContent(name) {
 
 function bindPanelEvents(name) {
   const content = document.getElementById('panelContent');
-
-  if (name === 'nuevo') {
-    document.getElementById('btnConfirmNuevo').onclick = () => {
-      if (confirm('¿Crear nuevo proyecto? Se perderá todo el contenido actual.')) {
-        CV.newProject();
-        closePanel();
-      }
-    };
-    content.querySelectorAll('[data-size]').forEach(btn => {
-      btn.onclick = () => {
-        if (btn.dataset.size === 'Personalizado') {
-          // Abrir panel de formato con la sección personalizada visible
-          openPanel('formato');
-        } else {
-          CV.newProject();
-          CV.setSheetSize(btn.dataset.size);
-          closePanel();
-        }
-      };
-    });
-  }
 
   if (name === 'formato') {
     content.querySelectorAll('[data-size]').forEach(btn => {
@@ -399,7 +386,6 @@ function bindPanelEvents(name) {
   if (name === 'fondo') {
     const tipo = document.getElementById('fondoTipo');
     const opciones = document.getElementById('fondoOpciones');
-
     const render = () => {
       const t = tipo.value;
       if (t === 'transparente') {
@@ -618,32 +604,25 @@ function renderMarkdown(md) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
-
   html = html.replace(/```([\s\S]*?)```/g, (m, code) =>
     `<pre style="background:#f1f5f9; padding:0.6rem; border-radius:6px; overflow:auto; font-size:0.75rem;"><code>${code.trim()}</code></pre>`
   );
-
   html = html.replace(/^###### (.*)$/gm, '<h6>$1</h6>');
   html = html.replace(/^##### (.*)$/gm, '<h5>$1</h5>');
   html = html.replace(/^#### (.*)$/gm, '<h4>$1</h4>');
   html = html.replace(/^### (.*)$/gm, '<h3>$1</h3>');
   html = html.replace(/^## (.*)$/gm, '<h2 style="margin:1rem 0 0.5rem;">$1</h2>');
   html = html.replace(/^# (.*)$/gm, '<h1 style="margin:1rem 0 0.5rem; font-size:1.1rem;">$1</h1>');
-
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
   html = html.replace(/`(.+?)`/g, '<code style="background:#f1f5f9; padding:0.1rem 0.3rem; border-radius:4px;">$1</code>');
   html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" style="color:var(--primary);">$1</a>');
-
   html = html.replace(/^\s*[-*] (.+)$/gm, '<li>$1</li>');
   html = html.replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul style="margin:0.5rem 0 0.5rem 1rem;">${m}</ul>`);
-
   html = html.replace(/\[ \] (.+)/g, '☐ $1');
   html = html.replace(/\[x\] (.+)/gi, '☑ $1');
-
   html = html.replace(/\n\n/g, '</p><p style="margin:0.5rem 0;">');
   html = html.replace(/\n/g, '<br>');
-
   return `<p style="margin:0.5rem 0;">${html}</p>`;
 }
 
@@ -654,6 +633,7 @@ function download(dataURL, filename) {
   a.click();
 }
 
+// ===== BARRA FLOTANTE INFERIOR =====
 export function bindActionBar() {
   document.querySelectorAll('.floating-bar-actions button').forEach(btn => {
     btn.onclick = () => {
@@ -662,72 +642,27 @@ export function bindActionBar() {
       if (a === 'borrar') CV.deleteActive();
       if (a === 'frente') CV.bringForward();
       if (a === 'atras') CV.sendBackward();
-      if (a === 'centrar') CV.centerActive();
       if (a === 'rotar-izq') CV.rotateActive(-90);
       if (a === 'rotar-der') CV.rotateActive(90);
       if (a === 'voltear-h') CV.flipActive('h');
       if (a === 'voltear-v') CV.flipActive('v');
-      if (a === 'bloquear') CV.toggleLock();
       if (a === 'recortar') TOOLS.openCropModal();
-      if (a === 'scroll-left') CV.scrollLeft();
-      if (a === 'scroll-right') CV.scrollRight();
-      if (a === 'zoom-in') CV.zoomIn();
-      if (a === 'zoom-out') CV.zoomOut();
-      if (a === 'zoom-reset') CV.zoomReset();
     };
   });
 }
 
-export function makeBarDraggable() {
-  const bar = document.getElementById('floatingBar');
-  const handle = document.getElementById('dragHandle');
-  if (!bar || !handle) return;
-
-  let isDragging = false;
-  let startX = 0, startY = 0, startLeft = 0, startTop = 0;
-
-  function getPos() {
-    const rect = bar.getBoundingClientRect();
-    return { left: rect.left, top: rect.top };
-  }
-
-  function onStart(e) {
-    isDragging = true;
-    bar.classList.add('dragging');
-    const pos = getPos();
-    bar.style.left = pos.left + 'px';
-    bar.style.top = pos.top + 'px';
-    bar.style.bottom = 'auto';
-    bar.style.transform = 'none';
-    bar.style.right = 'auto';
-    const point = e.touches ? e.touches[0] : e;
-    startX = point.clientX;
-    startY = point.clientY;
-    startLeft = pos.left;
-    startTop = pos.top;
-    e.preventDefault();
-  }
-
-  function onMove(e) {
-    if (!isDragging) return;
-    const point = e.touches ? e.touches[0] : e;
-    const dx = point.clientX - startX;
-    const dy = point.clientY - startY;
-    bar.style.left = (startLeft + dx) + 'px';
-    bar.style.top = (startTop + dy) + 'px';
-    e.preventDefault();
-  }
-
-  function onEnd() {
-    if (!isDragging) return;
-    isDragging = false;
-    bar.classList.remove('dragging');
-  }
-
-  handle.addEventListener('mousedown', onStart);
-  handle.addEventListener('touchstart', onStart, { passive: false });
-  document.addEventListener('mousemove', onMove);
-  document.addEventListener('touchmove', onMove, { passive: false });
-  document.addEventListener('mouseup', onEnd);
-  document.addEventListener('touchend', onEnd);
+// ===== NAV BAR (superior derecha) =====
+export function bindNavBar() {
+  document.querySelectorAll('.nav-bar button').forEach(btn => {
+    btn.onclick = () => {
+      const a = btn.dataset.nav;
+      if (a === 'zoom-in') CV.zoomIn();
+      if (a === 'zoom-out') CV.zoomOut();
+      if (a === 'zoom-fit') CV.zoomFitToScreen();
+      if (a === 'pan-up') CV.panUp();
+      if (a === 'pan-down') CV.panDown();
+      if (a === 'pan-left') CV.panLeft();
+      if (a === 'pan-right') CV.panRight();
+    };
+  });
 }
