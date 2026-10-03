@@ -1,7 +1,6 @@
 // ============================================
-// main.js — Inicialización
+// main.js
 // ============================================
-
 import * as CV from './canvas.js';
 import * as UI from './ui.js';
 import * as HIST from './history.js';
@@ -23,15 +22,11 @@ window.addEventListener('DOMContentLoaded', () => {
 
   btnMenu.onclick = () => {
     sideMenu.classList.toggle('open');
-    if (sideMenu.classList.contains('open')) overlay.classList.add('show');
-    else overlay.classList.remove('show');
+    overlay.classList.toggle('show', sideMenu.classList.contains('open'));
   };
 
   document.querySelectorAll('.side-menu li').forEach(li => {
-    li.onclick = () => {
-      UI.openPanel(li.dataset.panel);
-      sideMenu.classList.remove('open');
-    };
+    li.onclick = () => { UI.openPanel(li.dataset.panel); sideMenu.classList.remove('open'); };
   });
 
   document.getElementById('btnCerrarPanel').onclick = UI.closePanel;
@@ -48,7 +43,6 @@ window.addEventListener('DOMContentLoaded', () => {
   UI.bindActionBar();
 
   bindKeyboard();
-
   document.getElementById('cropCancel').onclick = TOOLS.closeCropModal;
   document.getElementById('cropApply').onclick = TOOLS.applyCrop;
 
@@ -57,31 +51,26 @@ window.addEventListener('DOMContentLoaded', () => {
 
   CV.canvas.on('selection:created', CV.updateObjectInfo);
   CV.canvas.on('selection:updated', CV.updateObjectInfo);
-  CV.canvas.on('selection:cleared', CV.updateObjectInfo);
+  CV.canvas.on('selection:cleared', () => { CV.hideDimensionOverlay(); });
   CV.canvas.on('object:modified', CV.updateObjectInfo);
-  CV.canvas.on('object:moving', CV.updateDimensionOverlay);
-  CV.canvas.on('object:scaling', CV.updateDimensionOverlay);
-  CV.canvas.on('object:rotating', CV.updateDimensionOverlay);
 
   HIST.initHistory();
 
-  window.addEventListener('resize', () => {
-    CV.updateDimensionOverlay();
-  });
+  window.addEventListener('resize', () => { CV.updateDimensionOverlay(); });
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('./sw.js').then((reg) => {
       setInterval(() => reg.update(), 30 * 1000);
       reg.addEventListener('updatefound', () => {
-        const newWorker = reg.installing;
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            newWorker.postMessage('skipWaiting');
+        const nw = reg.installing;
+        nw.addEventListener('statechange', () => {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+            nw.postMessage('skipWaiting');
             setTimeout(() => location.reload(), 300);
           }
         });
       });
-    }).catch(err => console.log('⚠️ SW error:', err));
+    }).catch(() => {});
 
     let refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -92,44 +81,28 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   setupBackButton();
-
   console.log('✅ App lista');
 });
 
 function setupBackButton() {
-  let hayCambiosSinGuardar = false;
-
-  CV.canvas.on('object:added', () => hayCambiosSinGuardar = true);
-  CV.canvas.on('object:modified', () => hayCambiosSinGuardar = true);
-  CV.canvas.on('object:removed', () => hayCambiosSinGuardar = true);
-
-  window.addEventListener('proyecto:guardado', () => hayCambiosSinGuardar = false);
-  window.addEventListener('proyecto:cargado', () => hayCambiosSinGuardar = false);
+  let cambios = false;
+  CV.canvas.on('object:added', () => cambios = true);
+  CV.canvas.on('object:modified', () => cambios = true);
+  CV.canvas.on('object:removed', () => cambios = true);
+  window.addEventListener('proyecto:guardado', () => cambios = false);
+  window.addEventListener('proyecto:cargado', () => cambios = false);
 
   history.pushState({ page: 'collage' }, '', location.href);
-
   window.addEventListener('popstate', () => {
-    if (hayCambiosSinGuardar) {
+    if (cambios) {
       history.pushState({ page: 'collage' }, '', location.href);
-      const quiere = confirm(
-        '⚠️ Tienes cambios sin guardar.\n\n' +
-        '¿Quieres guardarlos antes de salir?\n\n' +
-        'Aceptar = Guardar\n' +
-        'Cancelar = Salir sin guardar'
-      );
-      if (quiere) {
+      if (confirm('⚠️ Tienes cambios sin guardar.\n¿Guardar antes de salir?')) {
         import('./project.js').then(PROJ => {
           PROJ.saveProject();
-          setTimeout(() => {
-            if (confirm('Proyecto guardado. ¿Salir ahora?')) {
-              history.back();
-            }
-          }, 300);
+          setTimeout(() => { if (confirm('Guardado. ¿Salir?')) history.back(); }, 300);
         });
       } else {
-        if (confirm('¿Seguro que quieres salir sin guardar?')) {
-          history.back();
-        }
+        if (confirm('¿Salir sin guardar?')) history.back();
       }
     } else {
       history.back();
@@ -141,30 +114,13 @@ function bindKeyboard() {
   document.addEventListener('keydown', (e) => {
     const tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+    const o = CV.canvas?.getActiveObject();
+    if (o && o.isEditing) return;
 
-    const activeObj = CV.canvas?.getActiveObject();
-    if (activeObj && activeObj.isEditing) return;
-
-    if ((e.key === 'Delete' || e.key === 'Backspace') && CV.canvas?.getActiveObject()) {
-      e.preventDefault();
-      CV.deleteActive();
-    }
-
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
-      e.preventDefault();
-      CV.duplicateActive();
-    }
-
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-      e.preventDefault();
-      HIST.undo();
-    }
-
-    if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
-      e.preventDefault();
-      HIST.redo();
-    }
-
+    if ((e.key === 'Delete' || e.key === 'Backspace') && o) { e.preventDefault(); CV.deleteActive(); }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') { e.preventDefault(); CV.duplicateActive(); }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); HIST.undo(); }
+    if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) { e.preventDefault(); HIST.redo(); }
     if ((e.ctrlKey || e.metaKey) && e.key === '0') { e.preventDefault(); CV.zoomReset(); }
     if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) { e.preventDefault(); CV.zoomIn(); }
     if ((e.ctrlKey || e.metaKey) && e.key === '-') { e.preventDefault(); CV.zoomOut(); }
