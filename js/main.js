@@ -9,6 +9,11 @@ import * as TOOLS from './tools.js';
 
 window.addEventListener('DOMContentLoaded', () => {
   console.log('🚀 Collage Studio JPB');
+  // ===== SPLASH SCREEN (1.5s) =====
+	setTimeout(() => {
+	  const splash = document.getElementById('splash');
+	  if (splash) splash.classList.add('hide');
+	}, 1500);
 
   CV.initCanvas();
 
