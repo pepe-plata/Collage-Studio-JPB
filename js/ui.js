@@ -25,20 +25,12 @@ export function openPanel(name) {
       'Cancelar = Guardar cambios primero'
     );
     if (quiere) {
-      // Nuevo sin guardar
       CV.newProject();
-      setTimeout(() => {
-        openPanel('formato');
-      }, 100);
+      setTimeout(() => openPanel('formato'), 100);
     } else {
-      // Guardar primero
-      import('./project.js').then(PROJ => {
-        PROJ.saveProject();
-        CV.newProject();
-        setTimeout(() => {
-          openPanel('formato');
-        }, 100);
-      });
+      PROJ.saveProject();
+      CV.newProject();
+      setTimeout(() => openPanel('formato'), 100);
     }
     sideMenu.classList.remove('open');
     overlay.classList.remove('show');
@@ -651,8 +643,9 @@ export function bindActionBar() {
   });
 }
 
-// ===== NAV BAR (superior derecha) =====
+// ===== NAV BAR (superior derecha, arrastrable) =====
 export function bindNavBar() {
+  // Botones
   document.querySelectorAll('.nav-bar button').forEach(btn => {
     btn.onclick = () => {
       const a = btn.dataset.nav;
@@ -665,4 +658,48 @@ export function bindNavBar() {
       if (a === 'pan-right') CV.panRight();
     };
   });
+
+  // Hacer la barra arrastrable
+  const bar = document.getElementById('navBar');
+  const handle = document.getElementById('navDragHandle');
+  if (!bar || !handle) return;
+
+  let dragging = false;
+  let startX = 0, startY = 0, startLeft = 0, startTop = 0;
+
+  function onStart(e) {
+    dragging = true;
+    bar.classList.add('dragging');
+    const rect = bar.getBoundingClientRect();
+    bar.style.left = rect.left + 'px';
+    bar.style.top = rect.top + 'px';
+    bar.style.right = 'auto';
+    const p = e.touches ? e.touches[0] : e;
+    startX = p.clientX;
+    startY = p.clientY;
+    startLeft = rect.left;
+    startTop = rect.top;
+    e.preventDefault();
+  }
+
+  function onMove(e) {
+    if (!dragging) return;
+    const p = e.touches ? e.touches[0] : e;
+    bar.style.left = (startLeft + p.clientX - startX) + 'px';
+    bar.style.top = (startTop + p.clientY - startY) + 'px';
+    e.preventDefault();
+  }
+
+  function onEnd() {
+    if (!dragging) return;
+    dragging = false;
+    bar.classList.remove('dragging');
+  }
+
+  handle.addEventListener('mousedown', onStart);
+  handle.addEventListener('touchstart', onStart, { passive: false });
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('touchmove', onMove, { passive: false });
+  document.addEventListener('mouseup', onEnd);
+  document.addEventListener('touchend', onEnd);
 }

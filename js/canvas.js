@@ -64,12 +64,16 @@ export function updateDimensionOverlay() {
   dimensionOverlay.textContent = `${wCm.toFixed(2)} × ${hCm.toFixed(2)} cm`;
   dimensionOverlay.classList.remove('hidden');
 
+  // ✅ getBoundingRect(true, true) → coords absolutas del objeto (sin controles)
+  const bound = obj.getBoundingRect(true, true);
   const canvasEl = canvas.upperCanvasEl;
   const canvasRect = canvasEl.getBoundingClientRect();
-  const objRect = obj.getBoundingRect(true, true);
+  const zoom = currentZoom;
 
-  const centerX = canvasRect.left + objRect.left + objRect.width / 2;
-  const bottomY = canvasRect.top + objRect.top + objRect.height - 6;
+  // Centro horizontal del objeto
+  const centerX = canvasRect.left + (bound.left + bound.width / 2) * zoom;
+  // Borde inferior interno (12px arriba del borde para que quede DENTRO)
+  const bottomY = canvasRect.top + (bound.top + bound.height) * zoom - 12;
 
   dimensionOverlay.style.left = centerX + 'px';
   dimensionOverlay.style.top = bottomY + 'px';
@@ -92,13 +96,15 @@ function initFabricEvents() {
 
 // ===== ZOOM =====
 export function zoomIn() {
-  currentZoom = Math.min(currentZoom * 1.15, 5);
-  applyZoom();
+  const ws = document.getElementById('workspace');
+  zoomAtPoint(currentZoom * 1.15, ws.clientWidth / 2, ws.clientHeight / 2);
 }
+
 export function zoomOut() {
-  currentZoom = Math.max(currentZoom / 1.15, 0.1);
-  applyZoom();
+  const ws = document.getElementById('workspace');
+  zoomAtPoint(currentZoom / 1.15, ws.clientWidth / 2, ws.clientHeight / 2);
 }
+
 export function zoomFitToScreen() {
   const ws = document.getElementById('workspace');
   if (!ws) return;
@@ -107,33 +113,63 @@ export function zoomFitToScreen() {
   const fit = Math.min(availW / canvas.width, availH / canvas.height, 1);
   currentZoom = Math.max(fit, 0.1);
   applyZoom();
-}
-export function zoomReset() { zoomFitToScreen(); }
-export function setZoom(z) {
-  currentZoom = Math.max(0.1, Math.min(z, 5));
-  applyZoom();
+  // Centrar scroll
+  requestAnimationFrame(() => {
+    ws.scrollLeft = Math.max(0, (canvas.width * currentZoom - ws.clientWidth) / 2 + 20);
+    ws.scrollTop = Math.max(0, (canvas.height * currentZoom - ws.clientHeight) / 2 + 20);
+  });
 }
 
-// ===== APLICAR ZOOM (usa zoom CSS que sí funciona bien con botones) =====
+export function zoomReset() { zoomFitToScreen(); }
+
+export function setZoom(z) {
+  const ws = document.getElementById('workspace');
+  zoomAtPoint(Math.max(0.1, Math.min(z, 5)), ws.clientWidth / 2, ws.clientHeight / 2);
+}
+
+// ✅ Zoom centrado en un punto del workspace
+function zoomAtPoint(newZoom, focalX, focalY) {
+  newZoom = Math.max(0.1, Math.min(newZoom, 5));
+  const ws = document.getElementById('workspace');
+  if (!ws) return;
+
+  const oldZoom = currentZoom;
+  if (Math.abs(newZoom - oldZoom) < 0.001) return;
+
+  // Guardar la posición lógica del punto focal ANTES del zoom
+  const focalCanvasX = (ws.scrollLeft + focalX) / oldZoom;
+  const focalCanvasY = (ws.scrollTop + focalY) / oldZoom;
+
+  currentZoom = newZoom;
+  applyZoom();
+
+  // Restaurar el punto focal
+  requestAnimationFrame(() => {
+    ws.scrollLeft = focalCanvasX * newZoom - focalX;
+    ws.scrollTop = focalCanvasY * newZoom - focalY;
+  });
+
+  updateCanvasInfo();
+}
+
+// ✅ Aplicar zoom con transform: scale
 function applyZoom() {
   const wrapper = document.getElementById('canvasWrapper');
-  const workspace = document.getElementById('workspace');
-  if (!wrapper || !workspace) return;
+  if (!wrapper) return;
 
-  // Guardar el centro visible actual
-  const centerX = workspace.scrollLeft + workspace.clientWidth / 2;
-  const centerY = workspace.scrollTop + workspace.clientHeight / 2;
+  const container = wrapper.querySelector('.canvas-container');
+  if (!container) return;
 
-  wrapper.style.zoom = currentZoom;
+  // El wrapper toma el tamaño escalado (para que el scroll funcione)
   wrapper.style.width = (canvas.width * currentZoom) + 'px';
   wrapper.style.height = (canvas.height * currentZoom) + 'px';
   wrapper.style.margin = '20px auto';
 
-  // Restaurar el centro (compensando el nuevo tamaño)
-  requestAnimationFrame(() => {
-    workspace.scrollLeft = centerX * currentZoom - workspace.clientWidth / 2;
-    workspace.scrollTop = centerY * currentZoom - workspace.clientHeight / 2;
-  });
+  // El container se escala desde la esquina superior izquierda
+  container.style.transform = `scale(${currentZoom})`;
+  container.style.transformOrigin = 'top left';
+  container.style.width = canvas.width + 'px';
+  container.style.height = canvas.height + 'px';
 
   updateCanvasInfo();
   updateDimensionOverlay();
@@ -403,8 +439,14 @@ export function deleteActive() {
   hideDimensionOverlay();
   canvas.renderAll();
 }
-export function bringForward() { const o = canvas.getActiveObject(); if (o) { canvas.bringToFront(o); canvas.renderAll(); } }
-export function sendBackward() { const o = canvas.getActiveObject(); if (o) { canvas.sendToBack(o); canvas.renderAll(); } }
+export function bringForward() {
+  const o = canvas.getActiveObject();
+  if (o) { canvas.bringForward(o); canvas.renderAll(); }   // ✅ una capa adelante
+}
+export function sendBackward() {
+  const o = canvas.getActiveObject();
+  if (o) { canvas.sendBackwards(o); canvas.renderAll(); }  // ✅ una capa atrás
+}
 export function centerActive() {
   const o = canvas.getActiveObject();
   if (!o) return;
@@ -486,4 +528,46 @@ export function setCustomSize(w, h, unit) {
   else if (unit === 'in') { wCm = w * 2.54; hCm = h * 2.54; }
   else if (unit === 'mm') { wCm = w / 10; hCm = h / 10; }
   setSheetSize('Personalizado', { w: wCm, h: hCm });
+}
+
+// ===== PINCH ZOOM EN WORKSPACE =====
+export function initWorkspacePinch() {
+  const ws = document.getElementById('workspace');
+  if (!ws) return;
+
+  let pinchStartDist = 0;
+  let pinchStartZoom = 1;
+  let focalX = 0;
+  let focalY = 0;
+
+  function getDist(touches) {
+    const [a, b] = touches;
+    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  }
+
+  ws.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      const rect = ws.getBoundingClientRect();
+      pinchStartDist = getDist(e.touches);
+      pinchStartZoom = currentZoom;
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      focalX = midX - rect.left;
+      focalY = midY - rect.top;
+    }
+  }, { passive: true });
+
+  ws.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 2 && pinchStartDist > 0) {
+      e.preventDefault();
+      const dist = getDist(e.touches);
+      const scale = dist / pinchStartDist;
+      const newZoom = Math.max(0.1, Math.min(pinchStartZoom * scale, 5));
+      zoomAtPoint(newZoom, focalX, focalY);
+    }
+  }, { passive: false });
+
+  ws.addEventListener('touchend', (e) => {
+    if (e.touches.length < 2) pinchStartDist = 0;
+  }, { passive: true });
 }

@@ -15,6 +15,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }, 1500);
 
   CV.initCanvas();
+  CV.initWorkspacePinch();   // ✅ Pinch en todo el workspace
 
   const btnMenu = document.getElementById('btnMenu');
   const sideMenu = document.getElementById('sideMenu');
@@ -41,7 +42,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnExportar').onclick = () => UI.openPanel('exportar');
 
   UI.bindActionBar();
-  UI.bindNavBar();  // ⭐ NUEVA
+  UI.bindNavBar();
 
   bindKeyboard();
 
