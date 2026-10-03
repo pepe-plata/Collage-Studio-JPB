@@ -12,6 +12,7 @@
   --success: #16a34a;
   --border: #e2e8f0;
   --shadow: 0 4px 12px rgba(0,0,0,0.08);
+  --workspace-bg: rgb(227, 228, 232);  /* ✅ NUEVO color de fondo */
 }
 
 html, body {
@@ -68,7 +69,6 @@ body {
   flex-shrink: 0;
 }
 .header-left { display: flex; align-items: center; gap: 0.5rem; }
-.header-icon { width: 22px; height: 22px; object-fit: contain; }
 .app-header h1 { font-size: 1rem; font-weight: 600; }
 .header-actions { display: flex; gap: 0.3rem; }
 .icon-btn {
@@ -122,32 +122,25 @@ body {
 .side-menu li.active { background: #e0e7ff; border-left-color: var(--primary); font-weight: 600; }
 .side-menu li .menu-icon { width: 18px; height: 18px; object-fit: contain; flex-shrink: 0; }
 
-/* ===== WORKSPACE ===== */
+/* ===== WORKSPACE (FONDO SÓLIDO) ===== */
 .workspace {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 1rem;
+  padding: 0;
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  background-color: #f8fafc;
-  background-image:
-    linear-gradient(45deg, #e2e8f0 25%, transparent 25%),
-    linear-gradient(-45deg, #e2e8f0 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #e2e8f0 75%),
-    linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
-  background-size: 20px 20px;
-  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-  /* ✅ Scroll en ambos ejes para canvas anchos */
+  background-color: var(--workspace-bg);  /* ✅ Fondo sólido RGB(227,228,232) */
   overflow-x: auto;
   overflow-y: auto;
+  position: relative;
 }
 
 .canvas-wrapper {
   position: relative;
   flex-shrink: 0;
-  /* ✅ Margen mínimo para que respire */
+  /* ✅ Margen para que el canvas respire sin considerar la barra flotante */
   margin: 20px auto;
 }
 
@@ -408,7 +401,6 @@ canvas { touch-action: none; }
 /* ===== RESPONSIVE ===== */
 @media (max-width: 600px) {
   .app-header h1 { font-size: 0.85rem; }
-  .header-icon { width: 20px; height: 20px; }
   .floating-bar-actions button { min-width: 46px; padding: 0.3rem; }
   .floating-bar-actions button img { width: 20px; height: 20px; }
   .floating-bar-actions button span { font-size: 0.55rem; }
