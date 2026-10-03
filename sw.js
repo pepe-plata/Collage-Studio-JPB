@@ -2,7 +2,7 @@
 // sw.js — Service Worker (network-first, cache fallback)
 // ============================================
 
-const CACHE = 'collage-jpb-v5'; // ⬅️ sube la versión
+const CACHE = 'collage-jpb-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -16,9 +16,10 @@ const ASSETS = [
   './js/tools.js',
   './js/filters.js',
   './js/project.js',
-  './icons/icon-192.png',   // ✅ NUEVO
-  './icons/icon-512.png',   // ✅ NUEVO
-  './icons/help.png',       // ✅ NUEVO
+  './icons/icon-16.png',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/help.png',
   './icons/duplicate.png',
   './icons/delete.png',
   './icons/sendback.png',
@@ -33,19 +34,34 @@ const ASSETS = [
   './icons/zoomin.png',
   './icons/zoomout.png',
   './icons/resetzoom.png',
-  'https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js'
+  './icons/moveleft.png',
+  './icons/moveright.png'
 ];
 
-// ===== INSTALL =====
 self.addEventListener('install', (e) => {
   console.log('🔧 SW instalando');
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(ASSETS).catch(() => {}))
+    caches.open(CACHE).then(async (cache) => {
+      for (const url of ASSETS) {
+        try {
+          const res = await fetch(url, { cache: 'no-cache' });
+          if (res.ok) await cache.put(url, res);
+          else console.warn('⚠️ No cacheado:', url, res.status);
+        } catch (err) {
+          console.warn('⚠️ Error cacheando:', url, err);
+        }
+      }
+      try {
+        const res = await fetch('https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js', { mode: 'no-cors' });
+        await cache.put('https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js', res);
+      } catch (err) {
+        console.warn('⚠️ Fabric.js no cacheado (se cargará online)');
+      }
+    })
   );
-  self.skipWaiting(); // ✅ activa inmediatamente la nueva versión
+  self.skipWaiting();
 });
 
-// ===== ACTIVATE =====
 self.addEventListener('activate', (e) => {
   console.log('✅ SW activo');
   e.waitUntil(
@@ -56,18 +72,13 @@ self.addEventListener('activate', (e) => {
   self.clients.claim();
 });
 
-// ===== FETCH: network-first, cache fallback =====
 self.addEventListener('fetch', (e) => {
-  // Solo GET
   if (e.request.method !== 'GET') return;
-
-  // No interceptar extensiones de Chrome
   if (e.request.url.startsWith('chrome-extension://')) return;
 
   e.respondWith(
     fetch(e.request)
       .then((res) => {
-        // Guardar copia fresca en caché
         if (res && res.status === 200 && res.type !== 'opaque') {
           const clone = res.clone();
           caches.open(CACHE).then(c => c.put(e.request, clone));
@@ -75,10 +86,8 @@ self.addEventListener('fetch', (e) => {
         return res;
       })
       .catch(() => {
-        // Sin red → usar caché
         return caches.match(e.request).then((cached) => {
           if (cached) return cached;
-          // Si es navegación, devolver index.html cacheado
           if (e.request.mode === 'navigate') {
             return caches.match('./index.html');
           }
@@ -87,7 +96,6 @@ self.addEventListener('fetch', (e) => {
   );
 });
 
-// ===== MENSAJES =====
 self.addEventListener('message', (e) => {
   if (e.data === 'skipWaiting') self.skipWaiting();
 });
