@@ -4,7 +4,7 @@
 
 import { canvas, addImageFromDataURL } from './canvas.js';
 
-// ===== RECORTAR IMAGEN =====
+// ===== RECORTAR =====
 export function openCropModal() {
   const obj = canvas.getActiveObject();
   if (!obj || obj.type !== 'image') {
@@ -16,29 +16,22 @@ export function openCropModal() {
   const cropCanvas = document.getElementById('cropCanvas');
   const ctx = cropCanvas.getContext('2d');
 
-  // Tamaño del canvas de recorte
   const maxW = Math.min(window.innerWidth * 0.8, 600);
   const maxH = window.innerHeight * 0.5;
-
   const scale = Math.min(maxW / obj.width, maxH / obj.height, 1);
+
   cropCanvas.width = obj.width * scale;
   cropCanvas.height = obj.height * scale;
-
-  // Dibujar la imagen
   ctx.drawImage(obj._element, 0, 0, cropCanvas.width, cropCanvas.height);
 
   modal.classList.add('show');
   modal.dataset.scale = scale;
 
-  // Selección con fabric sobre el canvas de recorte
   if (window._cropFabric) window._cropFabric.dispose();
 
-  const cropFabric = new fabric.Canvas('cropCanvas', {
-    selection: false
-  });
+  const cropFabric = new fabric.Canvas('cropCanvas', { selection: false });
   window._cropFabric = cropFabric;
 
-  // Rectángulo de selección
   const sel = new fabric.Rect({
     left: 50, top: 50,
     width: cropCanvas.width * 0.5,
@@ -67,13 +60,11 @@ export function applyCrop() {
   const sel = cropFabric.getObjects()[0];
   const scale = parseFloat(document.getElementById('cropModal').dataset.scale);
 
-  // Coordenadas en la imagen original
   const left = sel.left / scale;
   const top = sel.top / scale;
   const width = (sel.width * sel.scaleX) / scale;
   const height = (sel.height * sel.scaleY) / scale;
 
-  // Crear canvas temporal con la imagen recortada
   const tempCanvas = document.createElement('canvas');
   tempCanvas.width = width;
   tempCanvas.height = height;
@@ -81,14 +72,10 @@ export function applyCrop() {
   ctx.drawImage(obj._element, left, top, width, height, 0, 0, width, height);
 
   const dataURL = tempCanvas.toDataURL('image/png');
-
-  // Guardar posición/escala del objeto original
   const pos = { left: obj.left, top: obj.top, angle: obj.angle };
 
-  // Eliminar el objeto original
   canvas.remove(obj);
 
-  // Añadir la imagen recortada en su lugar
   addImageFromDataURL(dataURL).then(newImg => {
     newImg.set(pos);
     newImg.setCoords();
@@ -122,24 +109,11 @@ export function applyMask(tipo) {
 
   switch (tipo) {
     case 'circle':
-      clipPath = new fabric.Circle({
-        radius: size / 2,
-        originX: 'center',
-        originY: 'center',
-        left: 0,
-        top: 0
-      });
+      clipPath = new fabric.Circle({ radius: size / 2, originX: 'center', originY: 'center', left: 0, top: 0 });
       break;
     case 'heart': {
       const path = 'M 50 30 C 50 10, 20 10, 20 30 C 20 50, 50 70, 50 90 C 50 70, 80 50, 80 30 C 80 10, 50 10, 50 30 Z';
-      clipPath = new fabric.Path(path, {
-        originX: 'center',
-        originY: 'center',
-        left: 0,
-        top: 0,
-        scaleX: size / 100,
-        scaleY: size / 100
-      });
+      clipPath = new fabric.Path(path, { originX: 'center', originY: 'center', left: 0, top: 0, scaleX: size / 100, scaleY: size / 100 });
       break;
     }
     case 'star': {
@@ -149,14 +123,7 @@ export function applyMask(tipo) {
         const a = (Math.PI / 5) * i - Math.PI / 2;
         points.push({ x: Math.cos(a) * r, y: Math.sin(a) * r });
       }
-      clipPath = new fabric.Polygon(points, {
-        originX: 'center',
-        originY: 'center',
-        left: 0,
-        top: 0,
-        scaleX: size / 100,
-        scaleY: size / 100
-      });
+      clipPath = new fabric.Polygon(points, { originX: 'center', originY: 'center', left: 0, top: 0, scaleX: size / 100, scaleY: size / 100 });
       break;
     }
     case 'hexagon': {
@@ -165,29 +132,12 @@ export function applyMask(tipo) {
         const a = (Math.PI * 2 / 6) * i - Math.PI / 2;
         points.push({ x: Math.cos(a) * 50, y: Math.sin(a) * 50 });
       }
-      clipPath = new fabric.Polygon(points, {
-        originX: 'center',
-        originY: 'center',
-        left: 0,
-        top: 0,
-        scaleX: size / 100,
-        scaleY: size / 100
-      });
+      clipPath = new fabric.Polygon(points, { originX: 'center', originY: 'center', left: 0, top: 0, scaleX: size / 100, scaleY: size / 100 });
       break;
     }
-    case 'rounded': {
-      clipPath = new fabric.Rect({
-        width: w,
-        height: h,
-        rx: 30,
-        ry: 30,
-        originX: 'center',
-        originY: 'center',
-        left: 0,
-        top: 0
-      });
+    case 'rounded':
+      clipPath = new fabric.Rect({ width: w, height: h, rx: 30, ry: 30, originX: 'center', originY: 'center', left: 0, top: 0 });
       break;
-    }
     case 'none':
       obj.set('clipPath', null);
       canvas.renderAll();
@@ -220,16 +170,12 @@ export function addVectorSticker(tipo) {
   let sticker;
 
   switch (tipo) {
-    case 'arrow': {
-      const path = 'M 0 20 L 60 20 L 60 0 L 100 30 L 60 60 L 60 40 L 0 40 Z';
-      sticker = new fabric.Path(path, { ...base, fill: '#4f46e5' });
+    case 'arrow':
+      sticker = new fabric.Path('M 0 20 L 60 20 L 60 0 L 100 30 L 60 60 L 60 40 L 0 40 Z', { ...base, fill: '#4f46e5' });
       break;
-    }
-    case 'speech': {
-      const path = 'M 10 10 L 110 10 Q 120 10 120 20 L 120 70 Q 120 80 110 80 L 60 80 L 40 100 L 40 80 L 20 80 Q 10 80 10 70 L 10 20 Q 10 10 10 10 Z';
-      sticker = new fabric.Path(path, { ...base, fill: '#ffffff', stroke: '#4f46e5', strokeWidth: 3 });
+    case 'speech':
+      sticker = new fabric.Path('M 10 10 L 110 10 Q 120 10 120 20 L 120 70 Q 120 80 110 80 L 60 80 L 40 100 L 40 80 L 20 80 Q 10 80 10 70 L 10 20 Q 10 10 10 10 Z', { ...base, fill: '#ffffff', stroke: '#4f46e5', strokeWidth: 3 });
       break;
-    }
     case 'badge': {
       const points = [];
       for (let i = 0; i < 16; i++) {
@@ -240,11 +186,9 @@ export function addVectorSticker(tipo) {
       sticker = new fabric.Polygon(points, { ...base, fill: '#f59e0b' });
       break;
     }
-    case 'ribbon': {
-      const path = 'M 0 20 L 120 20 L 120 60 L 60 45 L 0 60 Z';
-      sticker = new fabric.Path(path, { ...base, fill: '#ec4899' });
+    case 'ribbon':
+      sticker = new fabric.Path('M 0 20 L 120 20 L 120 60 L 60 45 L 0 60 Z', { ...base, fill: '#ec4899' });
       break;
-    }
     case 'burst': {
       const points = [];
       const spikes = 12;
@@ -256,13 +200,10 @@ export function addVectorSticker(tipo) {
       sticker = new fabric.Polygon(points, { ...base, fill: '#facc15' });
       break;
     }
-    case 'cloud': {
-      const path = 'M 30 60 Q 0 60 0 40 Q 0 20 20 20 Q 25 0 50 0 Q 75 0 80 20 Q 110 20 110 40 Q 110 60 80 60 Z';
-      sticker = new fabric.Path(path, { ...base, fill: '#93c5fd' });
+    case 'cloud':
+      sticker = new fabric.Path('M 30 60 Q 0 60 0 40 Q 0 20 20 20 Q 25 0 50 0 Q 75 0 80 20 Q 110 20 110 40 Q 110 60 80 60 Z', { ...base, fill: '#93c5fd' });
       break;
-    }
-    default:
-      return;
+    default: return;
   }
 
   canvas.add(sticker);
@@ -271,7 +212,7 @@ export function addVectorSticker(tipo) {
   return sticker;
 }
 
-// ===== EFECTOS DE PAPEL =====
+// ===== PAPEL =====
 export function addPaperEffect(tipo) {
   const cx = canvas.width / 2;
   const cy = canvas.height / 2;
@@ -290,44 +231,18 @@ export function addPaperEffect(tipo) {
   let effect;
 
   switch (tipo) {
-    case 'tape-h': {
-      // Cinta adhesiva horizontal
-      effect = new fabric.Rect({
-        ...base,
-        width: 140, height: 40,
-        fill: 'rgba(250, 240, 200, 0.75)',
-        stroke: 'rgba(200, 180, 130, 0.5)',
-        strokeWidth: 1
-      });
+    case 'tape-h':
+      effect = new fabric.Rect({ ...base, width: 140, height: 40, fill: 'rgba(250, 240, 200, 0.75)', stroke: 'rgba(200, 180, 130, 0.5)', strokeWidth: 1 });
       break;
-    }
-    case 'tape-v': {
-      effect = new fabric.Rect({
-        ...base,
-        width: 40, height: 140,
-        fill: 'rgba(250, 240, 200, 0.75)',
-        stroke: 'rgba(200, 180, 130, 0.5)',
-        strokeWidth: 1
-      });
+    case 'tape-v':
+      effect = new fabric.Rect({ ...base, width: 40, height: 140, fill: 'rgba(250, 240, 200, 0.75)', stroke: 'rgba(200, 180, 130, 0.5)', strokeWidth: 1 });
       break;
-    }
-    case 'tape-diag': {
-      effect = new fabric.Rect({
-        ...base,
-        width: 140, height: 40,
-        fill: 'rgba(250, 240, 200, 0.75)',
-        stroke: 'rgba(200, 180, 130, 0.5)',
-        strokeWidth: 1,
-        angle: -30
-      });
+    case 'tape-diag':
+      effect = new fabric.Rect({ ...base, width: 140, height: 40, fill: 'rgba(250, 240, 200, 0.75)', stroke: 'rgba(200, 180, 130, 0.5)', strokeWidth: 1, angle: -30 });
       break;
-    }
-    case 'torn-paper': {
-      // Papel rasgado (borde irregular)
-      const path = 'M 0 0 L 200 0 L 200 20 L 190 25 L 200 30 L 185 40 L 200 50 L 190 60 L 200 70 L 180 80 L 200 90 L 195 100 L 0 100 L 5 90 L 0 80 L 15 70 L 0 60 L 10 50 L 0 40 L 15 30 L 0 20 Z';
-      effect = new fabric.Path(path, { ...base, fill: '#fef3c7' });
+    case 'torn-paper':
+      effect = new fabric.Path('M 0 0 L 200 0 L 200 20 L 190 25 L 200 30 L 185 40 L 200 50 L 190 60 L 200 70 L 180 80 L 200 90 L 195 100 L 0 100 L 5 90 L 0 80 L 15 70 L 0 60 L 10 50 L 0 40 L 15 30 L 0 20 Z', { ...base, fill: '#fef3c7' });
       break;
-    }
     case 'postit': {
       effect = new fabric.Rect({
         ...base,
@@ -335,7 +250,6 @@ export function addPaperEffect(tipo) {
         fill: '#fef08a',
         shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.2)', blur: 10, offsetX: 3, offsetY: 3 })
       });
-      // Añadir texto editable al post-it
       const text = new fabric.IText('Nota...', {
         left: cx, top: cy,
         originX: 'center', originY: 'center',
@@ -352,10 +266,8 @@ export function addPaperEffect(tipo) {
       canvas.renderAll();
       return;
     }
-    case 'clip': {
-      // Clip de papel
-      const path = 'M 30 10 L 30 70 Q 30 90 50 90 Q 70 90 70 70 L 70 20 Q 70 0 50 0 Q 30 0 30 20 L 30 60';
-      effect = new fabric.Path(path, {
+    case 'clip':
+      effect = new fabric.Path('M 30 10 L 30 70 Q 30 90 50 90 Q 70 90 70 70 L 70 20 Q 70 0 50 0 Q 30 0 30 20 L 30 60', {
         ...base,
         fill: 'transparent',
         stroke: '#64748b',
@@ -363,29 +275,16 @@ export function addPaperEffect(tipo) {
         strokeLineCap: 'round'
       });
       break;
-    }
     case 'pin': {
-      // Chincheta
-      const circle = new fabric.Circle({
-        radius: 15,
-        fill: '#dc2626',
-        originX: 'center', originY: 'center',
-        left: cx, top: cy
-      });
-      const shadow = new fabric.Circle({
-        radius: 6,
-        fill: 'rgba(0,0,0,0.3)',
-        originX: 'center', originY: 'center',
-        left: cx + 4, top: cy + 4
-      });
+      const circle = new fabric.Circle({ radius: 15, fill: '#dc2626', originX: 'center', originY: 'center', left: cx, top: cy });
+      const shadow = new fabric.Circle({ radius: 6, fill: 'rgba(0,0,0,0.3)', originX: 'center', originY: 'center', left: cx + 4, top: cy + 4 });
       canvas.add(shadow);
       canvas.add(circle);
       canvas.setActiveObject(circle);
       canvas.renderAll();
       return;
     }
-    default:
-      return;
+    default: return;
   }
 
   canvas.add(effect);

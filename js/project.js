@@ -7,7 +7,6 @@ import { clearHistory } from './history.js';
 
 const STORAGE_KEY = 'collage-jpb-project';
 
-// ===== GUARDAR =====
 export function saveProject() {
   try {
     const data = {
@@ -17,6 +16,7 @@ export function saveProject() {
       canvas: canvas.toJSON(['selectable', 'evented', 'clipPath'])
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    window.dispatchEvent(new Event('proyecto:guardado'));
     alert('✅ Proyecto guardado');
   } catch (e) {
     console.error(e);
@@ -24,7 +24,6 @@ export function saveProject() {
   }
 }
 
-// ===== CARGAR =====
 export function loadProject() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -32,19 +31,13 @@ export function loadProject() {
       alert('No hay proyecto guardado');
       return;
     }
-
     const data = JSON.parse(raw);
-
-    // Restaurar formato
-    if (data.formato) {
-      setSheetSize(data.formato);
-    }
-
-    // Restaurar contenido
+    if (data.formato) setSheetSize(data.formato);
     canvas.loadFromJSON(data.canvas, () => {
       canvas.renderAll();
       clearHistory();
       updateObjectInfo();
+      window.dispatchEvent(new Event('proyecto:cargado'));
       alert('✅ Proyecto cargado');
     });
   } catch (e) {
@@ -53,14 +46,12 @@ export function loadProject() {
   }
 }
 
-// ===== ELIMINAR =====
 export function deleteProject() {
   if (!confirm('¿Eliminar el proyecto guardado?')) return;
   localStorage.removeItem(STORAGE_KEY);
   alert('🗑️ Proyecto eliminado');
 }
 
-// ===== EXPORTAR JSON =====
 export function exportProjectFile() {
   const data = {
     version: 1,
@@ -75,7 +66,6 @@ export function exportProjectFile() {
   a.click();
 }
 
-// ===== IMPORTAR JSON =====
 export function importProjectFile(file) {
   const reader = new FileReader();
   reader.onload = (e) => {
@@ -86,6 +76,7 @@ export function importProjectFile(file) {
         canvas.renderAll();
         clearHistory();
         updateObjectInfo();
+        window.dispatchEvent(new Event('proyecto:cargado'));
         alert('✅ Proyecto importado');
       });
     } catch (err) {

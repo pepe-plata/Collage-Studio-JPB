@@ -9,11 +9,12 @@ import * as TOOLS from './tools.js';
 
 window.addEventListener('DOMContentLoaded', () => {
   console.log('🚀 Collage Studio JPB');
-  // ===== SPLASH SCREEN (1.5s) =====
-	setTimeout(() => {
-	  const splash = document.getElementById('splash');
-	  if (splash) splash.classList.add('hide');
-	}, 1500);
+
+  // Splash: ocultar a los 1.5s
+  setTimeout(() => {
+    const splash = document.getElementById('splash');
+    if (splash) splash.classList.add('hide');
+  }, 1500);
 
   CV.initCanvas();
 
@@ -28,7 +29,6 @@ window.addEventListener('DOMContentLoaded', () => {
     else overlay.classList.remove('show');
   };
 
-  // Items del menú
   document.querySelectorAll('.side-menu li').forEach(li => {
     li.onclick = () => {
       UI.openPanel(li.dataset.panel);
@@ -36,7 +36,6 @@ window.addEventListener('DOMContentLoaded', () => {
     };
   });
 
-  // Cerrar panel
   document.getElementById('btnCerrarPanel').onclick = UI.closePanel;
   overlay.onclick = () => {
     UI.closePanel();
@@ -48,14 +47,12 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnUndo').onclick = HIST.undo;
   document.getElementById('btnRedo').onclick = HIST.redo;
 
-  // Action bar (flotante)
+  // Action bar
   UI.bindActionBar();
   UI.makeBarDraggable();
 
-  // Atajos de teclado
+  // Atajos
   bindKeyboard();
-
-  // Zoom
   bindWheelZoom();
   bindPinchZoom();
 
@@ -66,7 +63,7 @@ window.addEventListener('DOMContentLoaded', () => {
   CV.updateCanvasInfo();
   CV.updateObjectInfo();
 
-  // Eventos del canvas
+  // Eventos canvas
   CV.canvas.on('selection:created', CV.updateObjectInfo);
   CV.canvas.on('selection:updated', CV.updateObjectInfo);
   CV.canvas.on('selection:cleared', CV.updateObjectInfo);
@@ -75,99 +72,87 @@ window.addEventListener('DOMContentLoaded', () => {
   CV.canvas.on('object:scaling', CV.updateDimensionOverlay);
   CV.canvas.on('object:rotating', CV.updateDimensionOverlay);
 
-  // Historial
   HIST.initHistory();
 
-  // ===== SERVICE WORKER con auto-update =====
-if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-  navigator.serviceWorker.register('./sw.js').then((reg) => {
-    console.log('✅ SW registrado');
-
-    // Buscar actualizaciones cada 30 segundos
-    setInterval(() => reg.update(), 30 * 1000);
-
-    // Cuando hay una nueva versión, activarla
-    reg.addEventListener('updatefound', () => {
-      const newWorker = reg.installing;
-      newWorker.addEventListener('statechange', () => {
-        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          // Hay nueva versión → recargar
-          console.log('🔄 Nueva versión disponible, recargando...');
-          newWorker.postMessage('skipWaiting');
-          setTimeout(() => location.reload(), 300);
-        }
-      });
-    });
-  }).catch(err => console.log('⚠️ SW error:', err));
-
-  // Si el SW cambia de controlador, recargar
-  let refreshing = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (refreshing) return;
-    refreshing = true;
-    location.reload();
+  // Auto-ajustar al redimensionar
+  window.addEventListener('resize', () => {
+    CV.updateDimensionOverlay();
   });
-}
+
+  // Service Worker con auto-update
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    navigator.serviceWorker.register('./sw.js').then((reg) => {
+      console.log('✅ SW registrado');
+      setInterval(() => reg.update(), 30 * 1000);
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            console.log('🔄 Nueva versión disponible, recargando...');
+            newWorker.postMessage('skipWaiting');
+            setTimeout(() => location.reload(), 300);
+          }
+        });
+      });
+    }).catch(err => console.log('⚠️ SW error:', err));
+
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshing) return;
+      refreshing = true;
+      location.reload();
+    });
+  }
+
+  // Botón atrás de Android
+  setupBackButton();
 
   console.log('✅ App lista');
 });
-  // ===== BOTÓN ATRÁS DE ANDROID =====
-let hayCambiosSinGuardar = false;
-let proyectoGuardado = false;
 
-// Marcar cambios cuando se modifica el canvas
-CV.canvas.on('object:added', () => hayCambiosSinGuardar = true);
-CV.canvas.on('object:modified', () => hayCambiosSinGuardar = true);
-CV.canvas.on('object:removed', () => hayCambiosSinGuardar = true);
+// ===== BOTÓN ATRÁS =====
+function setupBackButton() {
+  let hayCambiosSinGuardar = false;
 
-// Resetear cuando se guarda/carga
-window.addEventListener('proyecto:guardado', () => {
-  hayCambiosSinGuardar = false;
-  proyectoGuardado = true;
-});
-window.addEventListener('proyecto:cargado', () => {
-  hayCambiosSinGuardar = false;
-});
+  CV.canvas.on('object:added', () => hayCambiosSinGuardar = true);
+  CV.canvas.on('object:modified', () => hayCambiosSinGuardar = true);
+  CV.canvas.on('object:removed', () => hayCambiosSinGuardar = true);
 
-// Interceptar el botón atrás
-history.pushState({ page: 'collage' }, '', location.href);
+  window.addEventListener('proyecto:guardado', () => hayCambiosSinGuardar = false);
+  window.addEventListener('proyecto:cargado', () => hayCambiosSinGuardar = false);
 
-window.addEventListener('popstate', (e) => {
-  if (hayCambiosSinGuardar) {
-    // Volver a empujar para que no salga aún
-    history.pushState({ page: 'collage' }, '', location.href);
+  history.pushState({ page: 'collage' }, '', location.href);
 
-    // Preguntar
-    const quiere = confirm(
-      '⚠️ Tienes cambios sin guardar.\n\n' +
-      '¿Quieres guardarlos antes de salir?\n\n' +
-      'Aceptar = Guardar y salir\n' +
-      'Cancelar = Salir sin guardar'
-    );
-
-    if (quiere) {
-      // Guardar
-      import('./project.js').then(PROJ => {
-        PROJ.saveProject();
-        setTimeout(() => {
-          if (confirm('Proyecto guardado. ¿Salir ahora?')) {
-            window.removeEventListener('popstate', () => {});
-            history.back();
-          }
-        }, 300);
-      });
-    } else {
-      // Salir sin guardar
-      if (confirm('¿Seguro que quieres salir sin guardar los cambios?')) {
-        history.back();
+  window.addEventListener('popstate', () => {
+    if (hayCambiosSinGuardar) {
+      history.pushState({ page: 'collage' }, '', location.href);
+      const quiere = confirm(
+        '⚠️ Tienes cambios sin guardar.\n\n' +
+        '¿Quieres guardarlos antes de salir?\n\n' +
+        'Aceptar = Guardar\n' +
+        'Cancelar = Salir sin guardar'
+      );
+      if (quiere) {
+        import('./project.js').then(PROJ => {
+          PROJ.saveProject();
+          setTimeout(() => {
+            if (confirm('Proyecto guardado. ¿Salir ahora?')) {
+              history.back();
+            }
+          }, 300);
+        });
+      } else {
+        if (confirm('¿Seguro que quieres salir sin guardar?')) {
+          history.back();
+        }
       }
+    } else {
+      history.back();
     }
-  } else {
-    // Sin cambios: salir
-    history.back();
-  }
-});
+  });
+}
 
+// ===== ATAJOS =====
 function bindKeyboard() {
   document.addEventListener('keydown', (e) => {
     const tag = (e.target.tagName || '').toLowerCase();
@@ -202,6 +187,7 @@ function bindKeyboard() {
   });
 }
 
+// ===== WHEEL ZOOM (centrado en el cursor) =====
 function bindWheelZoom() {
   const wrapper = document.getElementById('workspace');
   if (!wrapper) return;
@@ -213,6 +199,7 @@ function bindWheelZoom() {
   }, { passive: false });
 }
 
+// ===== PINCH ZOOM (centrado) =====
 function bindPinchZoom() {
   const el = CV.canvas?.upperCanvasEl;
   if (!el) return;

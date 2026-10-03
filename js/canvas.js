@@ -57,14 +57,12 @@ export function updateDimensionOverlay() {
   dimensionOverlay.textContent = `${w.toFixed(2)} × ${h.toFixed(2)} cm`;
   dimensionOverlay.classList.remove('hidden');
 
-  // Posición: usar el bounding rect del objeto
   const rect = obj.getBoundingRect(true);
   const canvasEl = canvas.upperCanvasEl;
   const canvasRect = canvasEl.getBoundingClientRect();
-  const zoom = currentZoom;
 
-  const left = canvasRect.left + (rect.left + rect.width / 2) * zoom;
-  const top = canvasRect.top + (rect.top + rect.height + 12) * zoom;
+  const left = canvasRect.left + (rect.left + rect.width / 2);
+  const top = canvasRect.top + (rect.top + rect.height) + 15;
 
   dimensionOverlay.style.left = left + 'px';
   dimensionOverlay.style.top = top + 'px';
@@ -88,69 +86,92 @@ export function setSheetSize(key) {
   canvas.setWidth(wPx);
   canvas.setHeight(hPx);
 
-  currentZoom = 1;
-  applyZoomToWrapper();
+  // ✅ Ajustar automáticamente al viewport
+  zoomFitToScreen();
 
   canvas.renderAll();
   updateCanvasInfo();
 }
 
-// ===== CENTRAR CANVAS =====
-export function centerCanvasInWorkspace() {
-  const wrapper = document.getElementById('canvasWrapper');
-  if (!wrapper) return;
-  wrapper.style.margin = '0 auto';
-}
-
 // ===== ZOOM =====
 export function zoomIn() {
   currentZoom = Math.min(currentZoom * 1.15, 5);
-  applyZoomToWrapper();
+  applyZoom();
 }
+
 export function zoomOut() {
-  currentZoom = Math.max(currentZoom / 1.15, 0.2);
-  applyZoomToWrapper();
+  currentZoom = Math.max(currentZoom / 1.15, 0.1);
+  applyZoom();
 }
+
+export function zoomFitToScreen() {
+  const workspace = document.getElementById('workspace');
+  if (!workspace) return;
+
+  // Espacio disponible (dejando margen de 20px a cada lado + padding)
+  const availableW = workspace.clientWidth - 60;
+  const availableH = workspace.clientHeight - 60;
+
+  const fitZoom = Math.min(
+    availableW / canvas.width,
+    availableH / canvas.height,
+    1  // no agrandar más de 100%
+  );
+
+  currentZoom = Math.max(fitZoom, 0.1);
+  applyZoom();
+}
+
 export function zoomReset() {
-  currentZoom = 1;
-  applyZoomToWrapper();
+  zoomFitToScreen();
 }
+
 export function setZoom(z) {
-  currentZoom = Math.max(0.2, Math.min(z, 5));
-  applyZoomToWrapper();
+  currentZoom = Math.max(0.1, Math.min(z, 5));
+  applyZoom();
 }
 
-function applyZoomToWrapper() {
+// ===== APLICAR ZOOM (centrado en ambos ejes) =====
+function applyZoom() {
   const wrapper = document.getElementById('canvasWrapper');
-  if (!wrapper) return;
-  const container = wrapper.querySelector('.canvas-container');
-  if (!container) return;
+  const workspace = document.getElementById('workspace');
+  if (!wrapper || !workspace) return;
 
-  // ✅ Usar "zoom" en lugar de "transform: scale"
-  // El zoom afecta al layout (no solo visual), así que:
-  // - El centrado con margin auto funciona
-  // - Las barras de scroll aparecen correctamente
-  // - El canvas se re-centra al hacer zoom
+  // ✅ Usar CSS zoom: afecta al layout y permite centrado + scroll natural
   wrapper.style.zoom = currentZoom;
 
-  // Ajustar tamaño del wrapper para que el scroll funcione
-  wrapper.style.width = (container.offsetWidth * currentZoom) + 'px';
-  wrapper.style.height = (container.offsetHeight * currentZoom) + 'px';
+  // ✅ Ajustar tamaño del wrapper para que las barras de scroll funcionen bien
+  const w = canvas.width * currentZoom;
+  const h = canvas.height * currentZoom;
+  wrapper.style.width = w + 'px';
+  wrapper.style.height = h + 'px';
 
-  // ✅ Centrado horizontal con margin auto
-  wrapper.style.margin = '0 auto';
+  // ✅ Centrado horizontal con margen auto
+  wrapper.style.margin = '20px auto';
 
   updateCanvasInfo();
   updateDimensionOverlay();
 }
 
+// ===== SCROLL HORIZONTAL =====
+export function scrollLeft() {
+  const workspace = document.getElementById('workspace');
+  if (!workspace) return;
+  workspace.scrollBy({ left: -200, behavior: 'smooth' });
+}
+
+export function scrollRight() {
+  const workspace = document.getElementById('workspace');
+  if (!workspace) return;
+  workspace.scrollBy({ left: 200, behavior: 'smooth' });
+}
+
 // ===== INFO =====
 export function updateCanvasInfo() {
-  // El info-bar se eliminó del HTML, ahora el título muestra el formato
   const el = document.querySelector('.app-header h1');
   if (!el) return;
   const s = SHEET_SIZES[currentKey];
-  el.textContent = `🎨 Collage Studio JPB — ${s.label} (Zoom ${Math.round(currentZoom * 100)}%)`;
+  el.textContent = `${s.label} · Zoom ${Math.round(currentZoom * 100)}%`;
 }
 
 export function updateObjectInfo() {
