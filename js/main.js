@@ -1,5 +1,5 @@
 // ============================================
-// main.js — Inicialización y orquestación
+// main.js — Inicialización
 // ============================================
 
 import * as CV from './canvas.js';
@@ -46,12 +46,8 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnExportar').onclick = () => UI.openPanel('exportar');
 
   UI.bindActionBar();
-  UI.makeBarDraggable();
 
   bindKeyboard();
-
-  // Pinch zoom global
-  bindPinchZoom();
 
   document.getElementById('cropCancel').onclick = TOOLS.closeCropModal;
   document.getElementById('cropApply').onclick = TOOLS.applyCrop;
@@ -73,7 +69,6 @@ window.addEventListener('DOMContentLoaded', () => {
     CV.updateDimensionOverlay();
   });
 
-  // Service Worker
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('./sw.js').then((reg) => {
       setInterval(() => reg.update(), 30 * 1000);
@@ -174,35 +169,4 @@ function bindKeyboard() {
     if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) { e.preventDefault(); CV.zoomIn(); }
     if ((e.ctrlKey || e.metaKey) && e.key === '-') { e.preventDefault(); CV.zoomOut(); }
   });
-}
-
-// ===== PINCH ZOOM (solo zoom con 2 dedos) =====
-function bindPinchZoom() {
-  const el = CV.canvas?.upperCanvasEl;
-  if (!el) return;
-  let initialDist = 0, initialZoom = 1;
-
-  function getDistance(touches) {
-    const [a, b] = touches;
-    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-  }
-
-  el.addEventListener('touchstart', (e) => {
-    if (e.touches.length === 2) {
-      initialDist = getDistance(e.touches);
-      initialZoom = CV.currentZoom;
-    }
-  }, { passive: true });
-
-  el.addEventListener('touchmove', (e) => {
-    if (e.touches.length === 2 && initialDist > 0) {
-      e.preventDefault();
-      const scale = getDistance(e.touches) / initialDist;
-      CV.setZoom(initialZoom * scale);
-    }
-  }, { passive: false });
-
-  el.addEventListener('touchend', (e) => {
-    if (e.touches.length < 2) initialDist = 0;
-  }, { passive: true });
 }

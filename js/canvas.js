@@ -17,129 +17,61 @@ export const SHEET_SIZES = {
 };
 
 export const PX_PER_CM = 37.795;
-export const PX_PER_INCH = 96;
-export const PX_PER_MM = 3.7795;
 
 export let canvas = null;
 export let currentSize = { w: 21.59, h: 27.94 };
 export let currentKey = 'Carta';
 export let currentZoom = 1;
 
-// Estado para el paneo y selección estilo Canva
-let isPanning = false;
-let panStart = { x: 0, y: 0, scrollLeft: 0, scrollTop: 0 };
-let pointerDownPos = { x: 0, y: 0 };
-let pointerDownTarget = null;
-
 let dimensionOverlay = null;
+
+// Estado para las interacciones manuales
+let state = {
+  isPanning: false,
+  isDraggingObject: false,
+  isPinching: false,
+  pointerDownPos: { x: 0, y: 0 },
+  pointerDownTarget: null,
+  panStart: { scrollLeft: 0, scrollTop: 0, x: 0, y: 0 },
+  dragStart: { left: 0, top: 0, x: 0, y: 0 },
+  pinchStart: { distance: 0, zoom: 1, midX: 0, midY: 0, scrollLeft: 0, scrollTop: 0 }
+};
 
 // ===== INICIALIZACIÓN =====
 export function initCanvas() {
   canvas = new fabric.Canvas('c', {
     backgroundColor: '#ffffff',
     preserveObjectStacking: true,
-    selection: false,        // ❌ Desactivamos la selección de rectángulo
+    selection: false,
     skipTargetFind: false,
     fireRightClick: false,
-    stopContextMenu: true
+    stopContextMenu: true,
+    // Desactivar interacciones internas de Fabric
+    allowTouchScrolling: true,
+    // Desactivar el sistema de selección de Fabric
+    interactive: false
   });
 
-  setSheetSize('Carta');
+  // Crear overlay de dimensiones
   initDimensionOverlay();
-  initCanvaInteractions();
+
+  // Inicializar interacciones manuales
+  initInteractions();
+
+  setSheetSize('Carta');
 
   return canvas;
 }
 
-// ===== CANVA-STYLE INTERACTIONS =====
-function initCanvaInteractions() {
-  const el = canvas.upperCanvasEl;
-  const workspace = document.getElementById('workspace');
-
-  // --- POINTER DOWN ---
-  el.addEventListener('pointerdown', (e) => {
-    pointerDownPos = { x: e.clientX, y: e.clientY };
-    pointerDownTarget = canvas.findTarget(e);
-
-    // Si el target NO es un objeto del canvas (es el fondo), iniciamos paneo
-    if (!pointerDownTarget) {
-      isPanning = true;
-      panStart = {
-        x: e.clientX,
-        y: e.clientY,
-        scrollLeft: workspace.scrollLeft,
-        scrollTop: workspace.scrollTop
-      };
-      el.style.cursor = 'grabbing';
-      canvas.discardActiveObject();
-      canvas.renderAll();
-    } else {
-      // Hay objeto debajo → seleccionar inmediatamente (visual)
-      canvas.setActiveObject(pointerDownTarget);
-      canvas.renderAll();
-    }
-  });
-
-  // --- POINTER MOVE ---
-  el.addEventListener('pointermove', (e) => {
-    if (isPanning) {
-      const dx = e.clientX - panStart.x;
-      const dy = e.clientY - panStart.y;
-      workspace.scrollLeft = panStart.scrollLeft - dx;
-      workspace.scrollTop = panStart.scrollTop - dy;
-    }
-  });
-
-  // --- POINTER UP ---
-  el.addEventListener('pointerup', (e) => {
-    const dx = Math.abs(e.clientX - pointerDownPos.x);
-    const dy = Math.abs(e.clientY - pointerDownPos.y);
-
-    // Si el paneo estaba activo y no se movió mucho → fue un "click" en el fondo
-    if (isPanning) {
-      if (dx < 5 && dy < 5) {
-        // Fue un click en el fondo → deseleccionar
-        canvas.discardActiveObject();
-        canvas.renderAll();
-      }
-      isPanning = false;
-      el.style.cursor = 'default';
-      return;
-    }
-
-    // Si había un objeto debajo y NO nos movimos → dejarlo seleccionado (ya lo está)
-    // Si nos movimos, Fabric ya se encargó de moverlo (por el propio drag de Fabric)
-    // Si NO había target y no fue paneo → deseleccionar
-    if (!pointerDownTarget) {
-      canvas.discardActiveObject();
-      canvas.renderAll();
-    }
-
-    pointerDownTarget = null;
-    updateDimensionOverlay();
-  });
-
-  // --- POINTER CANCEL ---
-  el.addEventListener('pointercancel', () => {
-    isPanning = false;
-    pointerDownTarget = null;
-    el.style.cursor = 'default';
-  });
-
-  // --- POINTER LEAVE ---
-  el.addEventListener('pointerleave', () => {
-    if (isPanning) {
-      isPanning = false;
-      el.style.cursor = 'default';
-    }
-  });
-}
-
-// ===== OVERLAY DE DIMENSIONES =====
+// ===== OVERLAY =====
 function initDimensionOverlay() {
-  dimensionOverlay = document.createElement('div');
-  dimensionOverlay.className = 'dimension-overlay hidden';
-  document.body.appendChild(dimensionOverlay);
+  dimensionOverlay = document.getElementById('dimensionOverlay');
+  if (!dimensionOverlay) {
+    dimensionOverlay = document.createElement('div');
+    dimensionOverlay.id = 'dimensionOverlay';
+    dimensionOverlay.className = 'dimension-overlay hidden';
+    document.body.appendChild(dimensionOverlay);
+  }
 }
 
 export function updateDimensionOverlay() {
@@ -159,8 +91,8 @@ export function updateDimensionOverlay() {
   const canvasEl = canvas.upperCanvasEl;
   const canvasRect = canvasEl.getBoundingClientRect();
 
-  const left = canvasRect.left + (rect.left + rect.width / 2);
-  const top = canvasRect.top + (rect.top + rect.height) + 15;
+  const left = canvasRect.left + rect.left + rect.width / 2;
+  const top = canvasRect.top + rect.top - 10;
 
   dimensionOverlay.style.left = left + 'px';
   dimensionOverlay.style.top = top + 'px';
@@ -170,81 +102,219 @@ export function hideDimensionOverlay() {
   if (dimensionOverlay) dimensionOverlay.classList.add('hidden');
 }
 
-// ===== CONFIGURACIÓN DE HANDLES ESTILO CANVA =====
-function applyCanvaHandles(obj) {
-  // Colores
-  const handleFill = '#ffffff';
-  const handleBorder = 'rgb(184,184,184)';
-  const borderColor = '#4f46e5';
+// ===== INTERACCIONES MANUALES ESTILO CANVA =====
+function initInteractions() {
+  const upperCanvas = canvas.upperCanvasEl;
+  const workspace = document.getElementById('workspace');
 
-  obj.set({
-    cornerColor: handleFill,
-    cornerStrokeColor: handleBorder,
-    borderColor: borderColor,
-    borderScaleFactor: 2,
-    transparentCorners: false,
-    padding: 3,
-    cornerSize: 16
+  // --- POINTER DOWN ---
+  upperCanvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch' && e.isPrimary === false) return;
+
+    state.pointerDownPos = { x: e.clientX, y: e.clientY };
+    state.pointerDownTarget = canvas.findTarget(e);
+
+    if (state.pointerDownTarget) {
+      // Hay un objeto debajo
+      const wasSelected = canvas.getActiveObject() === state.pointerDownTarget;
+      canvas.setActiveObject(state.pointerDownTarget);
+      updateDimensionOverlay();
+      canvas.renderAll();
+
+      // Si YA estaba seleccionado, permitir arrastrarlo
+      if (wasSelected) {
+        state.isDraggingObject = true;
+        state.dragStart = {
+          left: state.pointerDownTarget.left,
+          top: state.pointerDownTarget.top,
+          x: e.clientX,
+          y: e.clientY
+        };
+      }
+    } else {
+      // No hay objeto → iniciar paneo
+      state.isPanning = true;
+      state.panStart = {
+        scrollLeft: workspace.scrollLeft,
+        scrollTop: workspace.scrollTop,
+        x: e.clientX,
+        y: e.clientY
+      };
+      canvas.discardActiveObject();
+      hideDimensionOverlay();
+      canvas.renderAll();
+      upperCanvas.style.cursor = 'grabbing';
+    }
+
+    upperCanvas.setPointerCapture(e.pointerId);
   });
 
-  // Handles de las esquinas → círculos
-  ['tl', 'tr', 'bl', 'br'].forEach(corner => {
-    obj.setControlVisible(corner, true);
+  // --- POINTER MOVE ---
+  upperCanvas.addEventListener('pointermove', (e) => {
+    if (state.isPanning) {
+      const dx = e.clientX - state.panStart.x;
+      const dy = e.clientY - state.panStart.y;
+      workspace.scrollLeft = state.panStart.scrollLeft - dx;
+      workspace.scrollTop = state.panStart.scrollTop - dy;
+    } else if (state.isDraggingObject && state.pointerDownTarget) {
+      const dx = e.clientX - state.dragStart.x;
+      const dy = e.clientY - state.dragStart.y;
+      state.pointerDownTarget.set({
+        left: state.dragStart.left + dx,
+        top: state.dragStart.top + dy
+      });
+      state.pointerDownTarget.setCoords();
+      canvas.renderAll();
+      updateDimensionOverlay();
+    }
   });
 
-  // Handles laterales → rectángulos
-  // Fabric por defecto son cuadrados, pero podemos cambiar el tamaño visual
-  obj.setControlsVisibility({
-    mt: true,
-    mb: true,
-    ml: true,
-    mr: true,
-    mtr: true
+  // --- POINTER UP ---
+  upperCanvas.addEventListener('pointerup', (e) => {
+    const dx = Math.abs(e.clientX - state.pointerDownPos.x);
+    const dy = Math.abs(e.clientY - state.pointerDownPos.y);
+    const moved = dx > 5 || dy > 5;
+
+    if (state.isPanning) {
+      // Si no se movió → fue un click en el vacío → deseleccionar
+      if (!moved) {
+        canvas.discardActiveObject();
+        hideDimensionOverlay();
+        canvas.renderAll();
+      }
+      state.isPanning = false;
+      upperCanvas.style.cursor = 'default';
+    } else if (state.isDraggingObject) {
+      state.isDraggingObject = false;
+      canvas.fire('object:modified', { target: state.pointerDownTarget });
+    } else if (state.pointerDownTarget) {
+      // Fue un click sobre un objeto sin arrastrar → seleccionarlo
+      // Ya está seleccionado, solo confirmar
+      updateDimensionOverlay();
+    }
+
+    state.pointerDownTarget = null;
   });
+
+  // --- POINTER CANCEL ---
+  upperCanvas.addEventListener('pointercancel', () => {
+    state.isPanning = false;
+    state.isDraggingObject = false;
+    state.pointerDownTarget = null;
+    upperCanvas.style.cursor = 'default';
+  });
+
+  // --- WHEEL ZOOM (Shift + scroll = zoom) ---
+  workspace.addEventListener('wheel', (e) => {
+    if (e.shiftKey) {
+      e.preventDefault();
+      // Zoom centrado en la posición del mouse
+      const rect = workspace.getBoundingClientRect();
+      const focalX = e.clientX - rect.left;
+      const focalY = e.clientY - rect.top;
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      applyZoomAtPoint(currentZoom + delta, focalX, focalY);
+    }
+  }, { passive: false });
+
+  // --- PINCH ZOOM (táctil) ---
+  initPinchZoom();
 }
 
-// ===== TAMAÑO DEL LIENZO =====
-export function setSheetSize(key, customSize = null) {
-  if (key === 'Personalizado' && customSize) {
-    currentKey = 'Personalizado';
-    currentSize = { w: customSize.w, h: customSize.h };
-  } else {
-    const size = SHEET_SIZES[key];
-    if (!size) return;
-    currentKey = key;
-    currentSize = { w: size.w, h: size.h };
-  }
+// ===== PINCH ZOOM con punto focal =====
+function initPinchZoom() {
+  const el = canvas.upperCanvasEl;
+  const workspace = document.getElementById('workspace');
 
-  const wPx = Math.round(currentSize.w * PX_PER_CM);
-  const hPx = Math.round(currentSize.h * PX_PER_CM);
+  el.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const [a, b] = e.touches;
+      const midX = (a.clientX + b.clientX) / 2;
+      const midY = (a.clientY + b.clientY) / 2;
+      const rect = workspace.getBoundingClientRect();
 
-  canvas.setWidth(wPx);
-  canvas.setHeight(hPx);
+      state.isPinching = true;
+      state.pinchStart = {
+        distance: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+        zoom: currentZoom,
+        midX,
+        midY,
+        scrollLeft: workspace.scrollLeft,
+        scrollTop: workspace.scrollTop,
+        focalX: midX - rect.left + workspace.scrollLeft,
+        focalY: midY - rect.top + workspace.scrollTop
+      };
+    }
+  }, { passive: false });
 
-  // Ajustar al viewport
-  setTimeout(() => zoomFitToScreen(), 50);
+  el.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 2 && state.isPinching) {
+      e.preventDefault();
+      const [a, b] = e.touches;
+      const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      const scale = dist / state.pinchStart.distance;
+      const newZoom = Math.max(0.1, Math.min(state.pinchStart.zoom * scale, 5));
 
-  canvas.renderAll();
+      applyZoomAtPoint(newZoom, state.pinchStart.midX, state.pinchStart.midY);
+    }
+  }, { passive: false });
+
+  el.addEventListener('touchend', (e) => {
+    if (e.touches.length < 2) {
+      state.isPinching = false;
+    }
+  }, { passive: true });
+}
+
+// ===== APLICAR ZOOM =====
+function applyZoomAtPoint(newZoom, focalX, focalY) {
+  const workspace = document.getElementById('workspace');
+  const wrapper = document.getElementById('canvasWrapper');
+  if (!wrapper || !workspace) return;
+
+  const oldZoom = currentZoom;
+  currentZoom = Math.max(0.1, Math.min(newZoom, 5));
+
+  // Recalcular tamaño del wrapper
+  wrapper.style.width = (canvas.width * currentZoom) + 'px';
+  wrapper.style.height = (canvas.height * currentZoom) + 'px';
+
+  // Ajustar el canvas interno con zoom CSS
+  wrapper.style.zoom = currentZoom;
+
+  // Recalcular scroll para mantener el punto focal
+  const ratio = currentZoom / oldZoom;
+  const newScrollLeft = (workspace.scrollLeft + focalX) * ratio - focalX;
+  const newScrollTop = (workspace.scrollTop + focalY) * ratio - focalY;
+
+  workspace.scrollLeft = newScrollLeft;
+  workspace.scrollTop = newScrollTop;
+
   updateCanvasInfo();
+  updateDimensionOverlay();
 }
 
-// ===== ZOOM =====
 export function zoomIn() {
-  currentZoom = Math.min(currentZoom * 1.15, 5);
-  applyZoom();
+  const workspace = document.getElementById('workspace');
+  const cx = workspace.clientWidth / 2;
+  const cy = workspace.clientHeight / 2;
+  applyZoomAtPoint(currentZoom * 1.15, cx, cy);
 }
 
 export function zoomOut() {
-  currentZoom = Math.max(currentZoom / 1.15, 0.1);
-  applyZoom();
+  const workspace = document.getElementById('workspace');
+  const cx = workspace.clientWidth / 2;
+  const cy = workspace.clientHeight / 2;
+  applyZoomAtPoint(currentZoom / 1.15, cx, cy);
 }
 
 export function zoomFitToScreen() {
   const workspace = document.getElementById('workspace');
   if (!workspace) return;
 
-  const availableW = workspace.clientWidth - 60;
-  const availableH = workspace.clientHeight - 60;
+  const availableW = workspace.clientWidth - 40;
+  const availableH = workspace.clientHeight - 40;
 
   const fitZoom = Math.min(
     availableW / canvas.width,
@@ -265,27 +335,23 @@ export function setZoom(z) {
   applyZoom();
 }
 
-// ===== APLICAR ZOOM =====
 function applyZoom() {
   const wrapper = document.getElementById('canvasWrapper');
   const workspace = document.getElementById('workspace');
   if (!wrapper || !workspace) return;
 
   wrapper.style.zoom = currentZoom;
+  wrapper.style.width = (canvas.width * currentZoom) + 'px';
+  wrapper.style.height = (canvas.height * currentZoom) + 'px';
 
-  const w = canvas.width * currentZoom;
-  const h = canvas.height * currentZoom;
-  wrapper.style.width = w + 'px';
-  wrapper.style.height = h + 'px';
-
-  // Centrado horizontal con margen auto
-  wrapper.style.margin = '20px auto';
+  // Centrar scroll
+  workspace.scrollLeft = 0;
+  workspace.scrollTop = 0;
 
   updateCanvasInfo();
   updateDimensionOverlay();
 }
 
-// ===== SCROLL HORIZONTAL =====
 export function scrollLeft() {
   const workspace = document.getElementById('workspace');
   if (!workspace) return;
@@ -313,6 +379,46 @@ export function updateObjectInfo() {
   updateDimensionOverlay();
 }
 
+// ===== HANDLES ESTILO CANVA =====
+function applyCanvaHandles(obj) {
+  obj.set({
+    cornerColor: '#ffffff',
+    cornerStrokeColor: 'rgb(184,184,184)',
+    borderColor: '#4f46e5',
+    borderScaleFactor: 2,
+    transparentCorners: false,
+    padding: 3,
+    cornerSize: 16
+  });
+
+  obj.setControlsVisibility({
+    mt: true, mb: true, ml: true, mr: true, mtr: true
+  });
+}
+
+// ===== TAMAÑO DEL LIENZO =====
+export function setSheetSize(key, customSize = null) {
+  if (key === 'Personalizado' && customSize) {
+    currentKey = 'Personalizado';
+    currentSize = { w: customSize.w, h: customSize.h };
+  } else {
+    const size = SHEET_SIZES[key];
+    if (!size) return;
+    currentKey = key;
+    currentSize = { w: size.w, h: size.h };
+  }
+
+  const wPx = Math.round(currentSize.w * PX_PER_CM);
+  const hPx = Math.round(currentSize.h * PX_PER_CM);
+
+  canvas.setWidth(wPx);
+  canvas.setHeight(hPx);
+
+  setTimeout(() => zoomFitToScreen(), 50);
+  canvas.renderAll();
+  updateCanvasInfo();
+}
+
 // ===== AGREGAR IMAGEN =====
 export function addImageFromDataURL(dataURL, options = {}) {
   return new Promise((resolve) => {
@@ -336,13 +442,14 @@ export function addImageFromDataURL(dataURL, options = {}) {
       canvas.add(img);
       canvas.setActiveObject(img);
       canvas.renderAll();
+      updateDimensionOverlay();
       resolve(img);
     };
     imgEl.src = dataURL;
   });
 }
 
-// ===== AGREGAR FIGURA =====
+// ===== FIGURAS =====
 export function addShape(type, opts = {}) {
   let shape;
   const cx = canvas.width / 2;
@@ -370,6 +477,7 @@ export function addShape(type, opts = {}) {
   canvas.add(shape);
   canvas.setActiveObject(shape);
   canvas.renderAll();
+  updateDimensionOverlay();
   return shape;
 }
 
@@ -418,6 +526,7 @@ export function addText(text = 'Doble clic para editar', opts = {}) {
   canvas.add(t);
   canvas.setActiveObject(t);
   canvas.renderAll();
+  updateDimensionOverlay();
   return t;
 }
 
@@ -432,6 +541,7 @@ export function addEmoji(emoji) {
   canvas.add(t);
   canvas.setActiveObject(t);
   canvas.renderAll();
+  updateDimensionOverlay();
   return t;
 }
 
@@ -497,7 +607,7 @@ export function setTransparentBackground() {
   canvas.renderAll();
 }
 
-// ===== NUEVO (reset total) =====
+// ===== NUEVO =====
 export function newProject() {
   canvas.clear();
   canvas.backgroundColor = '#ffffff';
@@ -526,6 +636,7 @@ export function duplicateActive() {
     canvas.add(clon);
     canvas.setActiveObject(clon);
     canvas.renderAll();
+    updateDimensionOverlay();
   });
 }
 
@@ -534,6 +645,7 @@ export function deleteActive() {
   if (!objs.length) return;
   objs.forEach(o => canvas.remove(o));
   canvas.discardActiveObject();
+  hideDimensionOverlay();
   canvas.renderAll();
 }
 
@@ -579,6 +691,7 @@ export function toggleLock() {
   canvas.discardActiveObject();
   if (!locked) canvas.setActiveObject(obj);
   canvas.renderAll();
+  updateDimensionOverlay();
 }
 
 // ===== BORDES =====
@@ -685,7 +798,6 @@ export async function exportPDF() {
   return new Blob([pdfBytes], { type: 'application/pdf' });
 }
 
-// ===== PERSONALIZADO =====
 export function setCustomSize(w, h, unit) {
   let wCm = w, hCm = h;
   if (unit === 'px') {
@@ -698,7 +810,5 @@ export function setCustomSize(w, h, unit) {
     wCm = w / 10;
     hCm = h / 10;
   }
-  // cm ya es por defecto
-
   setSheetSize('Personalizado', { w: wCm, h: hCm });
 }
