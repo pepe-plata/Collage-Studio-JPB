@@ -24,6 +24,7 @@ html, body {
 }
 body { display: flex; flex-direction: column; height: 100vh; }
 
+/* SPLASH */
 .splash {
   position: fixed; inset: 0;
   background: linear-gradient(135deg, #4f46e5 0%, #818cf8 100%);
@@ -45,6 +46,7 @@ body { display: flex; flex-direction: column; height: 100vh; }
   100% { transform: scale(1); opacity: 1; }
 }
 
+/* HEADER */
 .app-header {
   background: var(--primary); color: white;
   padding: 0.5rem 0.8rem;
@@ -61,6 +63,7 @@ body { display: flex; flex-direction: column; height: 100vh; }
 .icon-btn:active { background: rgba(255,255,255,0.3); }
 .icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* MENÚ LATERAL */
 .side-menu {
   position: fixed; top: 0; left: -280px;
   width: 260px; height: 100%;
@@ -85,37 +88,69 @@ body { display: flex; flex-direction: column; height: 100vh; }
 .side-menu li.active { background: #e0e7ff; border-left-color: var(--primary); font-weight: 600; }
 .side-menu li .menu-icon { width: 18px; height: 18px; object-fit: contain; flex-shrink: 0; }
 
-/* ============ WORKSPACE ============ */
-/* ✅ Centrado real: text-align + inline-block.
-   No usar flexbox porque Chrome Android rompe el centrado cuando
-   el contenido es más ancho que el contenedor. */
+/* WORKSPACE */
 .workspace {
   flex: 1;
   min-height: 0;
   overflow: auto;
   background-color: var(--workspace-bg);
   position: relative;
-  text-align: center;    /* ✅ centra el wrapper inline-block */
+  text-align: center;
   -webkit-overflow-scrolling: touch;
 }
-
 .canvas-wrapper {
-  display: inline-block;  /* ✅ permite centrado con text-align */
+  display: inline-block;
   position: relative;
   vertical-align: top;
-  margin: 20px auto;      /* ✅ margen arriba/abajo y centrado */
+  margin: 20px auto;
   transform-origin: top left;
 }
-
 .canvas-container {
   box-shadow: 0 10px 40px rgba(0,0,0,0.15) !important;
   border-radius: 4px;
   overflow: visible !important;
 }
-
 canvas { touch-action: none; }
 
-/* ============ BARRA FLOTANTE (sin handle) ============ */
+/* NAV BAR (superior derecha) */
+.nav-bar {
+  position: fixed;
+  top: 70px;
+  right: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, 44px);
+  grid-template-rows: repeat(3, 44px);
+  gap: 4px;
+  background: white;
+  padding: 6px;
+  border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.2);
+  z-index: 85;
+}
+.nav-bar button {
+  background: var(--light);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.nav-bar button:hover { background: #e0e7ff; }
+.nav-bar button:active { background: var(--primary); }
+.nav-bar button img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  pointer-events: none;
+}
+.nav-empty {
+  background: transparent;
+  pointer-events: none;
+}
+
+/* BARRA FLOTANTE INFERIOR */
 .floating-bar {
   position: fixed;
   bottom: 15px;
@@ -144,8 +179,7 @@ canvas { touch-action: none; }
 .floating-bar-actions button img { width: 22px; height: 22px; object-fit: contain; pointer-events: none; }
 .floating-bar-actions button span { font-size: 0.6rem; font-weight: 600; white-space: nowrap; }
 
-/* ============ OVERLAY DE DIMENSIONES ============ */
-/* ✅ Ahora se ancla a la parte INFERIOR INTERNA del objeto */
+/* OVERLAY DIMENSIONES */
 .dimension-overlay {
   position: fixed;
   background: rgba(0, 0, 0, 0.75);
@@ -157,14 +191,13 @@ canvas { touch-action: none; }
   pointer-events: none;
   z-index: 9999;
   white-space: nowrap;
-  /* Se posiciona con left/top desde JS */
   transform: translate(-50%, -100%);
   box-shadow: 0 2px 8px rgba(0,0,0,0.4);
   line-height: 1.2;
 }
 .dimension-overlay.hidden { display: none; }
 
-/* ============ PANEL DERECHO ============ */
+/* PANEL DERECHO */
 .panel {
   position: fixed; top: 0; right: -100%;
   width: min(360px, 90vw); height: 100%;
@@ -188,6 +221,7 @@ canvas { touch-action: none; }
 }
 .overlay.show { opacity: 1; pointer-events: auto; }
 
+/* FORM */
 .form-group { margin-bottom: 1rem; }
 .form-group label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.3rem; }
 .form-group input[type="text"],
@@ -239,6 +273,7 @@ canvas { touch-action: none; }
 }
 .toggle-row button.active { background: var(--primary); color: white; border-color: var(--primary); }
 
+/* MODAL */
 .modal {
   position: fixed; inset: 0; background: rgba(0,0,0,0.7);
   display: none; justify-content: center; align-items: center;
@@ -261,4 +296,11 @@ canvas { touch-action: none; }
   .floating-bar-actions button img { width: 20px; height: 20px; }
   .floating-bar-actions button span { font-size: 0.55rem; }
   .splash img { width: 240px; height: 240px; }
+  .nav-bar {
+    top: 60px;
+    right: 8px;
+    grid-template-columns: repeat(3, 38px);
+    grid-template-rows: repeat(3, 38px);
+  }
+  .nav-bar button img { width: 18px; height: 18px; }
 }
