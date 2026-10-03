@@ -4,14 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#4f46e5">
-  <meta name="description" content="Collage Studio JPB">
   <title>Collage Studio JPB</title>
-
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="16x16" href="icons/icon-16.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-
   <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
   <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -27,16 +24,14 @@
       <h1>Collage Studio JPB</h1>
     </div>
     <div class="header-actions">
-      <button id="btnUndo" class="icon-btn" title="Deshacer (Ctrl+Z)">↶</button>
-      <button id="btnRedo" class="icon-btn" title="Rehacer (Ctrl+Y)">↷</button>
+      <button id="btnUndo" class="icon-btn" title="Deshacer">↶</button>
+      <button id="btnRedo" class="icon-btn" title="Rehacer">↷</button>
       <button id="btnExportar" class="icon-btn" title="Exportar">📤</button>
     </div>
   </header>
 
   <nav class="side-menu" id="sideMenu">
-    <div class="side-menu-header">
-      <span>Herramientas</span>
-    </div>
+    <div class="side-menu-header"><span>Herramientas</span></div>
     <ul>
       <li data-panel="nuevo">✨ Nuevo</li>
       <li data-panel="formato">📐 Cambiar Tamaño</li>
@@ -57,80 +52,29 @@
   </nav>
 
   <main class="workspace" id="workspace">
-    <div class="canvas-scroll-area" id="canvasScrollArea">
-      <div class="canvas-wrapper" id="canvasWrapper">
-        <canvas id="c"></canvas>
-      </div>
+    <div class="canvas-wrapper" id="canvasWrapper">
+      <canvas id="c"></canvas>
     </div>
   </main>
 
-  <!-- BARRA FLOTANTE (sin handle morado) -->
   <div class="floating-bar" id="floatingBar">
     <div class="floating-bar-actions">
-      <button data-action="borrar" title="Eliminar (Supr)">
-        <img src="icons/delete.png" alt="">
-        <span>Eliminar</span>
-      </button>
-      <button data-action="duplicar" title="Duplicar (Ctrl+D)">
-        <img src="icons/duplicate.png" alt="">
-        <span>Duplicar</span>
-      </button>
-      <button data-action="frente" title="Al frente">
-        <img src="icons/sendfront.png" alt="">
-        <span>Frente</span>
-      </button>
-      <button data-action="atras" title="Al fondo">
-        <img src="icons/sendback.png" alt="">
-        <span>Fondo</span>
-      </button>
-      <button data-action="recortar" title="Recortar">
-        <img src="icons/scissors.png" alt="">
-        <span>Recortar</span>
-      </button>
-      <button data-action="rotar-izq" title="Rotar -90°">
-        <img src="icons/rotate-left.png" alt="">
-        <span>Rotar ↺</span>
-      </button>
-      <button data-action="rotar-der" title="Rotar +90°">
-        <img src="icons/rotate-right.png" alt="">
-        <span>Rotar ↻</span>
-      </button>
-      <button data-action="voltear-h" title="Voltear H">
-        <img src="icons/fliphorizontal.png" alt="">
-        <span>Voltear H</span>
-      </button>
-      <button data-action="voltear-v" title="Voltear V">
-        <img src="icons/flipvertical.png" alt="">
-        <span>Voltear V</span>
-      </button>
-      <button data-action="centrar" title="Centrar">
-        <img src="icons/center.png" alt="">
-        <span>Centrar</span>
-      </button>
-      <button data-action="bloquear" title="Bloquear">
-        <img src="icons/padlock.png" alt="">
-        <span>Bloquear</span>
-      </button>
-      <button data-action="scroll-left" title="Scroll izquierda">
-        <img src="icons/moveleft.png" alt="">
-        <span>◀</span>
-      </button>
-      <button data-action="scroll-right" title="Scroll derecha">
-        <img src="icons/moveright.png" alt="">
-        <span>▶</span>
-      </button>
-      <button data-action="zoom-out" title="Zoom -">
-        <img src="icons/zoomout.png" alt="">
-        <span>Zoom -</span>
-      </button>
-      <button data-action="zoom-in" title="Zoom +">
-        <img src="icons/zoomin.png" alt="">
-        <span>Zoom +</span>
-      </button>
-      <button data-action="zoom-reset" title="Ajustar a pantalla">
-        <img src="icons/resetzoom.png" alt="">
-        <span>Ajustar</span>
-      </button>
+      <button data-action="borrar" title="Eliminar"><img src="icons/delete.png" alt=""><span>Eliminar</span></button>
+      <button data-action="duplicar" title="Duplicar"><img src="icons/duplicate.png" alt=""><span>Duplicar</span></button>
+      <button data-action="frente" title="Al frente"><img src="icons/sendfront.png" alt=""><span>Frente</span></button>
+      <button data-action="atras" title="Al fondo"><img src="icons/sendback.png" alt=""><span>Fondo</span></button>
+      <button data-action="recortar" title="Recortar"><img src="icons/scissors.png" alt=""><span>Recortar</span></button>
+      <button data-action="rotar-izq" title="Rotar -90°"><img src="icons/rotate-left.png" alt=""><span>Rotar ↺</span></button>
+      <button data-action="rotar-der" title="Rotar +90°"><img src="icons/rotate-right.png" alt=""><span>Rotar ↻</span></button>
+      <button data-action="voltear-h" title="Voltear H"><img src="icons/fliphorizontal.png" alt=""><span>Voltear H</span></button>
+      <button data-action="voltear-v" title="Voltear V"><img src="icons/flipvertical.png" alt=""><span>Voltear V</span></button>
+      <button data-action="centrar" title="Centrar"><img src="icons/center.png" alt=""><span>Centrar</span></button>
+      <button data-action="bloquear" title="Bloquear"><img src="icons/padlock.png" alt=""><span>Bloquear</span></button>
+      <button data-action="scroll-left" title="Scroll izquierda"><img src="icons/moveleft.png" alt=""><span>◀</span></button>
+      <button data-action="scroll-right" title="Scroll derecha"><img src="icons/moveright.png" alt=""><span>▶</span></button>
+      <button data-action="zoom-out" title="Zoom -"><img src="icons/zoomout.png" alt=""><span>Zoom -</span></button>
+      <button data-action="zoom-in" title="Zoom +"><img src="icons/zoomin.png" alt=""><span>Zoom +</span></button>
+      <button data-action="zoom-reset" title="Ajustar"><img src="icons/resetzoom.png" alt=""><span>Ajustar</span></button>
     </div>
   </div>
 
@@ -156,6 +100,5 @@
   <div class="overlay" id="overlay"></div>
 
   <script type="module" src="js/main.js"></script>
-
 </body>
 </html>
