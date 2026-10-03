@@ -2,7 +2,7 @@
 // sw.js — Service Worker (network-first, cache fallback)
 // ============================================
 
-const CACHE = 'collage-jpb-v4';
+const CACHE = 'collage-jpb-v5'; // ⬅️ sube la versión
 const ASSETS = [
   './',
   './index.html',
@@ -16,6 +16,23 @@ const ASSETS = [
   './js/tools.js',
   './js/filters.js',
   './js/project.js',
+  './icons/icon-192.png',   // ✅ NUEVO
+  './icons/icon-512.png',   // ✅ NUEVO
+  './icons/help.png',       // ✅ NUEVO
+  './icons/duplicate.png',
+  './icons/delete.png',
+  './icons/sendback.png',
+  './icons/sendfront.png',
+  './icons/center.png',
+  './icons/rotate-left.png',
+  './icons/rotate-right.png',
+  './icons/fliphorizontal.png',
+  './icons/flipvertical.png',
+  './icons/padlock.png',
+  './icons/scissors.png',
+  './icons/zoomin.png',
+  './icons/zoomout.png',
+  './icons/resetzoom.png',
   'https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js'
 ];
 
