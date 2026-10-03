@@ -10,7 +10,6 @@ import * as TOOLS from './tools.js';
 window.addEventListener('DOMContentLoaded', () => {
   console.log('🚀 Collage Studio JPB');
 
-  // Splash: ocultar a los 1.5s
   setTimeout(() => {
     const splash = document.getElementById('splash');
     if (splash) splash.classList.add('hide');
@@ -18,7 +17,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
   CV.initCanvas();
 
-  // Menú lateral
   const btnMenu = document.getElementById('btnMenu');
   const sideMenu = document.getElementById('sideMenu');
   const overlay = document.getElementById('overlay');
@@ -43,27 +41,24 @@ window.addEventListener('DOMContentLoaded', () => {
     overlay.classList.remove('show');
   };
 
-  // Undo/Redo
   document.getElementById('btnUndo').onclick = HIST.undo;
   document.getElementById('btnRedo').onclick = HIST.redo;
+  document.getElementById('btnExportar').onclick = () => UI.openPanel('exportar');
 
-  // Action bar
   UI.bindActionBar();
   UI.makeBarDraggable();
 
-  // Atajos
   bindKeyboard();
-  bindWheelZoom();
+
+  // Pinch zoom global
   bindPinchZoom();
 
-  // Modal de recorte
   document.getElementById('cropCancel').onclick = TOOLS.closeCropModal;
   document.getElementById('cropApply').onclick = TOOLS.applyCrop;
 
   CV.updateCanvasInfo();
   CV.updateObjectInfo();
 
-  // Eventos canvas
   CV.canvas.on('selection:created', CV.updateObjectInfo);
   CV.canvas.on('selection:updated', CV.updateObjectInfo);
   CV.canvas.on('selection:cleared', CV.updateObjectInfo);
@@ -74,21 +69,18 @@ window.addEventListener('DOMContentLoaded', () => {
 
   HIST.initHistory();
 
-  // Auto-ajustar al redimensionar
   window.addEventListener('resize', () => {
     CV.updateDimensionOverlay();
   });
 
-  // Service Worker con auto-update
+  // Service Worker
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('./sw.js').then((reg) => {
-      console.log('✅ SW registrado');
       setInterval(() => reg.update(), 30 * 1000);
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing;
         newWorker.addEventListener('statechange', () => {
           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            console.log('🔄 Nueva versión disponible, recargando...');
             newWorker.postMessage('skipWaiting');
             setTimeout(() => location.reload(), 300);
           }
@@ -104,13 +96,11 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Botón atrás de Android
   setupBackButton();
 
   console.log('✅ App lista');
 });
 
-// ===== BOTÓN ATRÁS =====
 function setupBackButton() {
   let hayCambiosSinGuardar = false;
 
@@ -152,7 +142,6 @@ function setupBackButton() {
   });
 }
 
-// ===== ATAJOS =====
 function bindKeyboard() {
   document.addEventListener('keydown', (e) => {
     const tag = (e.target.tagName || '').toLowerCase();
@@ -187,19 +176,7 @@ function bindKeyboard() {
   });
 }
 
-// ===== WHEEL ZOOM (centrado en el cursor) =====
-function bindWheelZoom() {
-  const wrapper = document.getElementById('workspace');
-  if (!wrapper) return;
-  wrapper.addEventListener('wheel', (e) => {
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-      if (e.deltaY < 0) CV.zoomIn(); else CV.zoomOut();
-    }
-  }, { passive: false });
-}
-
-// ===== PINCH ZOOM (centrado) =====
+// ===== PINCH ZOOM (solo zoom con 2 dedos) =====
 function bindPinchZoom() {
   const el = CV.canvas?.upperCanvasEl;
   if (!el) return;

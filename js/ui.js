@@ -40,7 +40,8 @@ export function closePanel() {
 
 function getPanelTitle(name) {
   return {
-    formato: '📐 Tamaño del lienzo',
+    nuevo: '✨ Nuevo Proyecto',
+    formato: '📐 Cambiar Tamaño',
     fondo: '🖼️ Fondo',
     imagenes: '📷 Insertar Imágenes',
     figuras: '🔷 Figuras geométricas',
@@ -59,10 +60,49 @@ function getPanelTitle(name) {
 
 function getPanelContent(name) {
   switch (name) {
+    case 'nuevo':
+      return `
+        <p style="font-size:0.9rem; margin-bottom:1rem;">
+          ¿Crear un nuevo proyecto? Se eliminará todo el contenido del canvas.
+        </p>
+        <button class="btn danger" id="btnConfirmNuevo">🗑️ Crear nuevo proyecto</button>
+        <hr style="margin:1rem 0; border:none; border-top:1px solid var(--border);">
+        <p style="font-size:0.85rem; font-weight:600; margin-bottom:0.5rem;">O elige un tamaño:</p>
+        <div id="nuevoTamaños">
+          ${Object.entries(CV.SHEET_SIZES).map(([key, s]) =>
+            `<button class="btn secondary" data-size="${key}">${s.label}</button>`
+          ).join('')}
+          <button class="btn secondary" data-size="Personalizado">📐 Personalizado...</button>
+        </div>
+      `;
+
     case 'formato':
-      return Object.entries(CV.SHEET_SIZES).map(([key, s]) =>
-        `<button class="btn ${key === CV.currentKey ? 'success' : 'secondary'}" data-size="${key}">${s.label}</button>`
-      ).join('');
+      return `
+        ${Object.entries(CV.SHEET_SIZES).map(([key, s]) =>
+          `<button class="btn ${key === CV.currentKey ? 'success' : 'secondary'}" data-size="${key}">${s.label}</button>`
+        ).join('')}
+        <button class="btn ${CV.currentKey === 'Personalizado' ? 'success' : 'secondary'}" data-size="Personalizado">📐 Personalizado...</button>
+        <div id="customForm" style="display:${CV.currentKey === 'Personalizado' ? 'block' : 'none'}; margin-top:1rem;">
+          <div class="form-group">
+            <label>Ancho</label>
+            <input type="number" id="customW" value="21" step="0.1" min="0.1">
+          </div>
+          <div class="form-group">
+            <label>Alto</label>
+            <input type="number" id="customH" value="29.7" step="0.1" min="0.1">
+          </div>
+          <div class="form-group">
+            <label>Unidades</label>
+            <select id="customUnit">
+              <option value="px">Píxeles (px)</option>
+              <option value="in">Pulgadas (in)</option>
+              <option value="mm">Milímetros (mm)</option>
+              <option value="cm" selected>Centímetros (cm)</option>
+            </select>
+          </div>
+          <button class="btn success" id="btnAplicarCustom">✅ Aplicar tamaño personalizado</button>
+        </div>
+      `;
 
     case 'fondo':
       return `
@@ -310,13 +350,50 @@ function getPanelContent(name) {
 function bindPanelEvents(name) {
   const content = document.getElementById('panelContent');
 
+  if (name === 'nuevo') {
+    document.getElementById('btnConfirmNuevo').onclick = () => {
+      if (confirm('¿Crear nuevo proyecto? Se perderá todo el contenido actual.')) {
+        CV.newProject();
+        closePanel();
+      }
+    };
+    content.querySelectorAll('[data-size]').forEach(btn => {
+      btn.onclick = () => {
+        if (btn.dataset.size === 'Personalizado') {
+          // Abrir panel de formato con la sección personalizada visible
+          openPanel('formato');
+        } else {
+          CV.newProject();
+          CV.setSheetSize(btn.dataset.size);
+          closePanel();
+        }
+      };
+    });
+  }
+
   if (name === 'formato') {
     content.querySelectorAll('[data-size]').forEach(btn => {
       btn.onclick = () => {
-        CV.setSheetSize(btn.dataset.size);
-        openPanel('formato');
+        if (btn.dataset.size === 'Personalizado') {
+          document.getElementById('customForm').style.display = 'block';
+          content.querySelectorAll('[data-size]').forEach(b => b.classList.remove('success'));
+          btn.classList.add('success');
+        } else {
+          CV.setSheetSize(btn.dataset.size);
+          openPanel('formato');
+        }
       };
     });
+    const btnCustom = document.getElementById('btnAplicarCustom');
+    if (btnCustom) {
+      btnCustom.onclick = () => {
+        const w = parseFloat(document.getElementById('customW').value) || 21;
+        const h = parseFloat(document.getElementById('customH').value) || 29.7;
+        const unit = document.getElementById('customUnit').value;
+        CV.setCustomSize(w, h, unit);
+        closePanel();
+      };
+    }
   }
 
   if (name === 'fondo') {
@@ -387,7 +464,6 @@ function bindPanelEvents(name) {
         r.readAsDataURL(file);
       });
       e.target.value = '';
-      // ✅ Cerrar el panel automáticamente
       closePanel();
     };
   }
@@ -537,7 +613,6 @@ function bindPanelEvents(name) {
   }
 }
 
-// ===== MINI MARKDOWN =====
 function renderMarkdown(md) {
   let html = md
     .replace(/&/g, '&amp;')
@@ -579,7 +654,6 @@ function download(dataURL, filename) {
   a.click();
 }
 
-// ===== BARRA FLOTANTE =====
 export function bindActionBar() {
   document.querySelectorAll('.floating-bar-actions button').forEach(btn => {
     btn.onclick = () => {
@@ -604,7 +678,6 @@ export function bindActionBar() {
   });
 }
 
-// ===== BARRA FLOTANTE ARRASTRABLE =====
 export function makeBarDraggable() {
   const bar = document.getElementById('floatingBar');
   const handle = document.getElementById('dragHandle');

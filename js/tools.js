@@ -158,13 +158,7 @@ export function addVectorSticker(tipo) {
 
   const base = {
     left: cx, top: cy,
-    originX: 'center', originY: 'center',
-    cornerColor: '#4f46e5',
-    cornerSize: 18,
-    transparentCorners: false,
-    borderColor: '#4f46e5',
-    borderScaleFactor: 2,
-    padding: 5
+    originX: 'center', originY: 'center'
   };
 
   let sticker;
@@ -219,13 +213,7 @@ export function addPaperEffect(tipo) {
 
   const base = {
     left: cx, top: cy,
-    originX: 'center', originY: 'center',
-    cornerColor: '#4f46e5',
-    cornerSize: 18,
-    transparentCorners: false,
-    borderColor: '#4f46e5',
-    borderScaleFactor: 2,
-    padding: 5
+    originX: 'center', originY: 'center'
   };
 
   let effect;

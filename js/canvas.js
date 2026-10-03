@@ -3,25 +3,33 @@
 // ============================================
 
 export const SHEET_SIZES = {
-  'MediaCarta':   { w: 21.59, h: 13.97, label: 'Media Carta 21.59 × 13.97 cm' },
-  'Carta':        { w: 21.59, h: 27.94, label: 'Carta (Letter) 21.59 × 27.94 cm' },
-  'Oficio':       { w: 21.59, h: 35.56, label: 'Oficio / Legal 21.59 × 35.56 cm' },
-  'A4':           { w: 21,    h: 29.7,  label: 'A4 21 × 29.7 cm' },
-  'DobleCarta':   { w: 43.18, h: 27.94, label: 'Doble Carta 43.18 × 27.94 cm' },
-  'Tabloide':     { w: 27.94, h: 43.18, label: 'Tabloide 27.94 × 43.18 cm' },
+  'MediaCarta':   { w: 21.59, h: 13.97, label: 'Media Carta 21.59 × 13.97 cm (8.5" × 5.5")' },
+  'Carta':        { w: 21.59, h: 27.94, label: 'Carta (Letter) 21.59 × 27.94 cm (8.5" × 11")' },
+  'Oficio':       { w: 21.59, h: 35.56, label: 'Oficio / Legal 21.59 × 35.56 cm (8.5" × 14")' },
+  'A4':           { w: 21,    h: 29.7,  label: 'A4 21 × 29.7 cm (8.27" × 11.69")' },
+  'DobleCarta':   { w: 43.18, h: 27.94, label: 'Doble Carta 43.18 × 27.94 cm (17" × 11")' },
+  'Tabloide':     { w: 27.94, h: 43.18, label: 'Tabloide 27.94 × 43.18 cm (11" × 17")' },
   'FotoInfantil': { w: 2.5,   h: 3.0,   label: 'Foto infantil 2.5 × 3.0 cm' },
-  'FotoPostal':   { w: 10.2,  h: 15.2,  label: 'Foto Postal 10.2 × 15.2 cm' },
+  'FotoPostal':   { w: 10.2,  h: 15.2,  label: 'Foto Postal 10.2 × 15.2 cm (4" × 6")' },
   'Foto5x7':      { w: 12.7,  h: 17.8,  label: '12.7 × 17.8 cm (5" × 7")' },
   'Foto6x8':      { w: 15.24, h: 20.32, label: '15.24 × 20.32 cm (6" × 8")' },
   'Foto8x10':     { w: 20.32, h: 25.4,  label: '20.32 × 25.4 cm (8" × 10")' }
 };
 
 export const PX_PER_CM = 37.795;
+export const PX_PER_INCH = 96;
+export const PX_PER_MM = 3.7795;
 
 export let canvas = null;
 export let currentSize = { w: 21.59, h: 27.94 };
 export let currentKey = 'Carta';
 export let currentZoom = 1;
+
+// Estado para el paneo y selección estilo Canva
+let isPanning = false;
+let panStart = { x: 0, y: 0, scrollLeft: 0, scrollTop: 0 };
+let pointerDownPos = { x: 0, y: 0 };
+let pointerDownTarget = null;
 
 let dimensionOverlay = null;
 
@@ -30,11 +38,101 @@ export function initCanvas() {
   canvas = new fabric.Canvas('c', {
     backgroundColor: '#ffffff',
     preserveObjectStacking: true,
-    selection: true
+    selection: false,        // ❌ Desactivamos la selección de rectángulo
+    skipTargetFind: false,
+    fireRightClick: false,
+    stopContextMenu: true
   });
+
   setSheetSize('Carta');
   initDimensionOverlay();
+  initCanvaInteractions();
+
   return canvas;
+}
+
+// ===== CANVA-STYLE INTERACTIONS =====
+function initCanvaInteractions() {
+  const el = canvas.upperCanvasEl;
+  const workspace = document.getElementById('workspace');
+
+  // --- POINTER DOWN ---
+  el.addEventListener('pointerdown', (e) => {
+    pointerDownPos = { x: e.clientX, y: e.clientY };
+    pointerDownTarget = canvas.findTarget(e);
+
+    // Si el target NO es un objeto del canvas (es el fondo), iniciamos paneo
+    if (!pointerDownTarget) {
+      isPanning = true;
+      panStart = {
+        x: e.clientX,
+        y: e.clientY,
+        scrollLeft: workspace.scrollLeft,
+        scrollTop: workspace.scrollTop
+      };
+      el.style.cursor = 'grabbing';
+      canvas.discardActiveObject();
+      canvas.renderAll();
+    } else {
+      // Hay objeto debajo → seleccionar inmediatamente (visual)
+      canvas.setActiveObject(pointerDownTarget);
+      canvas.renderAll();
+    }
+  });
+
+  // --- POINTER MOVE ---
+  el.addEventListener('pointermove', (e) => {
+    if (isPanning) {
+      const dx = e.clientX - panStart.x;
+      const dy = e.clientY - panStart.y;
+      workspace.scrollLeft = panStart.scrollLeft - dx;
+      workspace.scrollTop = panStart.scrollTop - dy;
+    }
+  });
+
+  // --- POINTER UP ---
+  el.addEventListener('pointerup', (e) => {
+    const dx = Math.abs(e.clientX - pointerDownPos.x);
+    const dy = Math.abs(e.clientY - pointerDownPos.y);
+
+    // Si el paneo estaba activo y no se movió mucho → fue un "click" en el fondo
+    if (isPanning) {
+      if (dx < 5 && dy < 5) {
+        // Fue un click en el fondo → deseleccionar
+        canvas.discardActiveObject();
+        canvas.renderAll();
+      }
+      isPanning = false;
+      el.style.cursor = 'default';
+      return;
+    }
+
+    // Si había un objeto debajo y NO nos movimos → dejarlo seleccionado (ya lo está)
+    // Si nos movimos, Fabric ya se encargó de moverlo (por el propio drag de Fabric)
+    // Si NO había target y no fue paneo → deseleccionar
+    if (!pointerDownTarget) {
+      canvas.discardActiveObject();
+      canvas.renderAll();
+    }
+
+    pointerDownTarget = null;
+    updateDimensionOverlay();
+  });
+
+  // --- POINTER CANCEL ---
+  el.addEventListener('pointercancel', () => {
+    isPanning = false;
+    pointerDownTarget = null;
+    el.style.cursor = 'default';
+  });
+
+  // --- POINTER LEAVE ---
+  el.addEventListener('pointerleave', () => {
+    if (isPanning) {
+      isPanning = false;
+      el.style.cursor = 'default';
+    }
+  });
 }
 
 // ===== OVERLAY DE DIMENSIONES =====
@@ -72,22 +170,59 @@ export function hideDimensionOverlay() {
   if (dimensionOverlay) dimensionOverlay.classList.add('hidden');
 }
 
+// ===== CONFIGURACIÓN DE HANDLES ESTILO CANVA =====
+function applyCanvaHandles(obj) {
+  // Colores
+  const handleFill = '#ffffff';
+  const handleBorder = 'rgb(184,184,184)';
+  const borderColor = '#4f46e5';
+
+  obj.set({
+    cornerColor: handleFill,
+    cornerStrokeColor: handleBorder,
+    borderColor: borderColor,
+    borderScaleFactor: 2,
+    transparentCorners: false,
+    padding: 3,
+    cornerSize: 16
+  });
+
+  // Handles de las esquinas → círculos
+  ['tl', 'tr', 'bl', 'br'].forEach(corner => {
+    obj.setControlVisible(corner, true);
+  });
+
+  // Handles laterales → rectángulos
+  // Fabric por defecto son cuadrados, pero podemos cambiar el tamaño visual
+  obj.setControlsVisibility({
+    mt: true,
+    mb: true,
+    ml: true,
+    mr: true,
+    mtr: true
+  });
+}
+
 // ===== TAMAÑO DEL LIENZO =====
-export function setSheetSize(key) {
-  const size = SHEET_SIZES[key];
-  if (!size) return;
+export function setSheetSize(key, customSize = null) {
+  if (key === 'Personalizado' && customSize) {
+    currentKey = 'Personalizado';
+    currentSize = { w: customSize.w, h: customSize.h };
+  } else {
+    const size = SHEET_SIZES[key];
+    if (!size) return;
+    currentKey = key;
+    currentSize = { w: size.w, h: size.h };
+  }
 
-  currentKey = key;
-  currentSize = { w: size.w, h: size.h };
-
-  const wPx = Math.round(size.w * PX_PER_CM);
-  const hPx = Math.round(size.h * PX_PER_CM);
+  const wPx = Math.round(currentSize.w * PX_PER_CM);
+  const hPx = Math.round(currentSize.h * PX_PER_CM);
 
   canvas.setWidth(wPx);
   canvas.setHeight(hPx);
 
-  // ✅ Ajustar automáticamente al viewport
-  zoomFitToScreen();
+  // Ajustar al viewport
+  setTimeout(() => zoomFitToScreen(), 50);
 
   canvas.renderAll();
   updateCanvasInfo();
@@ -108,14 +243,13 @@ export function zoomFitToScreen() {
   const workspace = document.getElementById('workspace');
   if (!workspace) return;
 
-  // Espacio disponible (dejando margen de 20px a cada lado + padding)
   const availableW = workspace.clientWidth - 60;
   const availableH = workspace.clientHeight - 60;
 
   const fitZoom = Math.min(
     availableW / canvas.width,
     availableH / canvas.height,
-    1  // no agrandar más de 100%
+    1
   );
 
   currentZoom = Math.max(fitZoom, 0.1);
@@ -131,22 +265,20 @@ export function setZoom(z) {
   applyZoom();
 }
 
-// ===== APLICAR ZOOM (centrado en ambos ejes) =====
+// ===== APLICAR ZOOM =====
 function applyZoom() {
   const wrapper = document.getElementById('canvasWrapper');
   const workspace = document.getElementById('workspace');
   if (!wrapper || !workspace) return;
 
-  // ✅ Usar CSS zoom: afecta al layout y permite centrado + scroll natural
   wrapper.style.zoom = currentZoom;
 
-  // ✅ Ajustar tamaño del wrapper para que las barras de scroll funcionen bien
   const w = canvas.width * currentZoom;
   const h = canvas.height * currentZoom;
   wrapper.style.width = w + 'px';
   wrapper.style.height = h + 'px';
 
-  // ✅ Centrado horizontal con margen auto
+  // Centrado horizontal con margen auto
   wrapper.style.margin = '20px auto';
 
   updateCanvasInfo();
@@ -170,8 +302,11 @@ export function scrollRight() {
 export function updateCanvasInfo() {
   const el = document.querySelector('.app-header h1');
   if (!el) return;
-  const s = SHEET_SIZES[currentKey];
-  el.textContent = `${s.label} · Zoom ${Math.round(currentZoom * 100)}%`;
+  let label = SHEET_SIZES[currentKey]?.label;
+  if (currentKey === 'Personalizado') {
+    label = `Personalizado ${currentSize.w.toFixed(1)} × ${currentSize.h.toFixed(1)} cm`;
+  }
+  el.textContent = `${label} · Zoom ${Math.round(currentZoom * 100)}%`;
 }
 
 export function updateObjectInfo() {
@@ -187,14 +322,10 @@ export function addImageFromDataURL(dataURL, options = {}) {
         left: options.left ?? canvas.width / 2,
         top: options.top ?? canvas.height / 2,
         originX: 'center',
-        originY: 'center',
-        cornerColor: '#4f46e5',
-        cornerSize: 18,
-        transparentCorners: false,
-        borderColor: '#4f46e5',
-        borderScaleFactor: 2,
-        padding: 5
+        originY: 'center'
       });
+
+      applyCanvaHandles(img);
 
       const maxSize = Math.min(canvas.width, canvas.height) * 0.6;
       if (imgEl.width > maxSize || imgEl.height > maxSize) {
@@ -220,13 +351,7 @@ export function addShape(type, opts = {}) {
   const base = {
     left: cx, top: cy,
     originX: 'center', originY: 'center',
-    fill: opts.fill ?? '#4f46e5',
-    cornerColor: '#4f46e5',
-    cornerSize: 18,
-    transparentCorners: false,
-    borderColor: '#4f46e5',
-    borderScaleFactor: 2,
-    padding: 5
+    fill: opts.fill ?? '#4f46e5'
   };
 
   switch (type) {
@@ -241,6 +366,7 @@ export function addShape(type, opts = {}) {
     default: shape = new fabric.Rect({ ...base, width: 120, height: 120 });
   }
 
+  applyCanvaHandles(shape);
   canvas.add(shape);
   canvas.setActiveObject(shape);
   canvas.renderAll();
@@ -286,14 +412,9 @@ export function addText(text = 'Doble clic para editar', opts = {}) {
     fontStyle: opts.fontStyle ?? 'normal',
     underline: opts.underline ?? false,
     linethrough: opts.linethrough ?? false,
-    textAlign: 'center',
-    cornerColor: '#4f46e5',
-    cornerSize: 18,
-    transparentCorners: false,
-    borderColor: '#4f46e5',
-    borderScaleFactor: 2,
-    padding: 5
+    textAlign: 'center'
   });
+  applyCanvaHandles(t);
   canvas.add(t);
   canvas.setActiveObject(t);
   canvas.renderAll();
@@ -305,14 +426,9 @@ export function addEmoji(emoji) {
     left: canvas.width / 2,
     top: canvas.height / 2,
     originX: 'center', originY: 'center',
-    fontSize: 80,
-    cornerColor: '#4f46e5',
-    cornerSize: 18,
-    transparentCorners: false,
-    borderColor: '#4f46e5',
-    borderScaleFactor: 2,
-    padding: 5
+    fontSize: 80
   });
+  applyCanvaHandles(t);
   canvas.add(t);
   canvas.setActiveObject(t);
   canvas.renderAll();
@@ -381,12 +497,32 @@ export function setTransparentBackground() {
   canvas.renderAll();
 }
 
+// ===== NUEVO (reset total) =====
+export function newProject() {
+  canvas.clear();
+  canvas.backgroundColor = '#ffffff';
+  canvas.setBackgroundImage(null, () => {});
+  currentZoom = 1;
+  currentKey = 'Carta';
+  currentSize = { w: 21.59, h: 27.94 };
+
+  const wPx = Math.round(currentSize.w * PX_PER_CM);
+  const hPx = Math.round(currentSize.h * PX_PER_CM);
+  canvas.setWidth(wPx);
+  canvas.setHeight(hPx);
+
+  setTimeout(() => zoomFitToScreen(), 50);
+  canvas.renderAll();
+  updateCanvasInfo();
+}
+
 // ===== MANIPULACIÓN =====
 export function duplicateActive() {
   const obj = canvas.getActiveObject();
   if (!obj) return;
   obj.clone((clon) => {
     clon.set({ left: obj.left + 20, top: obj.top + 20 });
+    applyCanvaHandles(clon);
     canvas.add(clon);
     canvas.setActiveObject(clon);
     canvas.renderAll();
@@ -461,7 +597,6 @@ export function applyBorder(width, color, style = 'solid') {
   canvas.renderAll();
 }
 
-// ===== SOMBRAS =====
 export function applyShadow(type) {
   const obj = canvas.getActiveObject();
   if (!obj) return;
@@ -472,7 +607,6 @@ export function applyShadow(type) {
   canvas.renderAll();
 }
 
-// ===== RELLENO =====
 export function setFillColor(color) {
   const obj = canvas.getActiveObject();
   if (!obj) return;
@@ -487,7 +621,6 @@ export function setFillColor(color) {
   canvas.renderAll();
 }
 
-// ===== OPACIDAD =====
 export function setOpacity(value) {
   const obj = canvas.getActiveObject();
   if (!obj) return;
@@ -495,7 +628,6 @@ export function setOpacity(value) {
   canvas.renderAll();
 }
 
-// ===== TEXTO =====
 export function toggleBold() {
   const obj = canvas.getActiveObject();
   if (!obj) return;
@@ -551,4 +683,22 @@ export async function exportPDF() {
   page.drawImage(pngImage, { x: 0, y: 0, width: wPt, height: hPt });
   const pdfBytes = await pdfDoc.save();
   return new Blob([pdfBytes], { type: 'application/pdf' });
+}
+
+// ===== PERSONALIZADO =====
+export function setCustomSize(w, h, unit) {
+  let wCm = w, hCm = h;
+  if (unit === 'px') {
+    wCm = w / PX_PER_CM;
+    hCm = h / PX_PER_CM;
+  } else if (unit === 'in') {
+    wCm = w * 2.54;
+    hCm = h * 2.54;
+  } else if (unit === 'mm') {
+    wCm = w / 10;
+    hCm = h / 10;
+  }
+  // cm ya es por defecto
+
+  setSheetSize('Personalizado', { w: wCm, h: hCm });
 }
