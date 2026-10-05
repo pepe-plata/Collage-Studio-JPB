@@ -24,9 +24,15 @@
       <h1>Collage Studio JPB</h1>
     </div>
     <div class="header-actions">
-      <button id="btnUndo" class="icon-btn" title="Deshacer">↶</button>
-      <button id="btnRedo" class="icon-btn" title="Rehacer">↷</button>
-      <button id="btnExportar" class="icon-btn" title="Exportar">📤</button>
+      <button id="btnUndo" class="icon-btn" title="Deshacer">
+        <img src="icons/undo.png" alt="Deshacer">
+      </button>
+      <button id="btnRedo" class="icon-btn" title="Rehacer">
+        <img src="icons/redo.png" alt="Rehacer">
+      </button>
+      <button id="btnExportar" class="icon-btn" title="Exportar">
+        <img src="icons/export.png" alt="Exportar">
+      </button>
     </div>
   </header>
 
@@ -35,6 +41,7 @@
     <ul>
       <li data-panel="nuevo">✨ Nuevo</li>
       <li data-panel="formato">📐 Cambiar Tamaño</li>
+      <li data-panel="margenes">📏 Márgenes</li>
       <li data-panel="fondo">🖼️ Fondo</li>
       <li data-panel="imagenes">📷 Insertar Imágenes...</li>
       <li data-panel="figuras">🔷 Figuras</li>
@@ -57,7 +64,6 @@
     </div>
   </main>
 
-  <!-- BARRA NAV SUPERIOR DERECHA (arrastrable) -->
   <div class="nav-bar" id="navBar">
     <div class="nav-drag-handle" id="navDragHandle" title="Arrastrar">
       <span>⋮⋮</span>
@@ -91,7 +97,6 @@
     </div>
   </div>
 
-  <!-- BARRA FLOTANTE INFERIOR -->
   <div class="floating-bar" id="floatingBar">
     <div class="floating-bar-actions">
       <button data-action="borrar" title="Eliminar"><img src="icons/delete.png" alt=""><span>Eliminar</span></button>
@@ -99,6 +104,9 @@
       <button data-action="frente" title="Al frente"><img src="icons/sendfront.png" alt=""><span>Frente</span></button>
       <button data-action="atras" title="Atrás"><img src="icons/sendback.png" alt=""><span>Atrás</span></button>
       <button data-action="recortar" title="Recortar"><img src="icons/scissors.png" alt=""><span>Recortar</span></button>
+      <button data-action="redimensionar" title="Cambiar Tamaño"><img src="icons/resize.png" alt=""><span>Cambiar Tamaño</span></button>
+      <button data-action="efectos" title="Efectos"><img src="icons/efects.png" alt=""><span>Efectos</span></button>
+      <button data-action="pegar" title="Pegar"><img src="icons/paste.png" alt=""><span>Pegar</span></button>
       <button data-action="rotar-izq" title="Rotar -90°"><img src="icons/rotate-left.png" alt=""><span>Rotar ↺</span></button>
       <button data-action="rotar-der" title="Rotar +90°"><img src="icons/rotate-right.png" alt=""><span>Rotar ↻</span></button>
       <button data-action="voltear-h" title="Voltear H"><img src="icons/fliphorizontal.png" alt=""><span>Voltear H</span></button>
