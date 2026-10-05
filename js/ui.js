@@ -16,7 +16,6 @@ export function openPanel(name) {
   const overlay = document.getElementById('overlay');
   const sideMenu = document.getElementById('sideMenu');
 
-  // ✅ Manejo especial de "Nuevo"
   if (name === 'nuevo') {
     const quiere = confirm(
       '¿Crear nuevo proyecto?\n\n' +
@@ -61,7 +60,9 @@ export function closePanel() {
 
 function getPanelTitle(name) {
   return {
-    formato: '📐 Seleccionar tamaño de Lienzo',
+    formato: '📐 Cambiar Tamaño de Hoja',
+    redimensionarObjeto: '📏 Cambiar Tamaño del Objeto',
+    margenes: '📏 Márgenes',
     fondo: '🖼️ Fondo',
     imagenes: '📷 Insertar Imágenes',
     figuras: '🔷 Figuras geométricas',
@@ -80,6 +81,43 @@ function getPanelTitle(name) {
 
 function getPanelContent(name) {
   switch (name) {
+    case 'redimensionarObjeto': {
+      const size = CV.getActiveObjectSizeCm();
+      const w = size ? size.w.toFixed(2) : 5;
+      const h = size ? size.h.toFixed(2) : 5;
+
+      // ✅ Combo con tamaños predefinidos
+      const presets = [
+        { key: '', label: '— Personalizado —' },
+        ...Object.entries(CV.SHEET_SIZES).map(([key, s]) => ({ key, label: s.label }))
+      ];
+
+      return `
+        <p style="font-size:0.8rem; color:var(--gray); margin-bottom:1rem;">
+          Ajusta el tamaño del objeto seleccionado en centímetros.
+        </p>
+        <div class="form-group">
+          <label>Tamaño predefinido</label>
+          <select id="objPreset">
+            ${presets.map(p => `<option value="${p.key}">${p.label}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Ancho (cm)</label>
+          <input type="number" id="objW" value="${w}" step="0.1" min="0.1">
+        </div>
+        <div class="form-group">
+          <label>Alto (cm)</label>
+          <input type="number" id="objH" value="${h}" step="0.1" min="0.1">
+        </div>
+        <div class="check-row">
+          <input type="checkbox" id="objKeepRatio">
+          <label for="objKeepRatio">Mantener relación de aspecto</label>
+        </div>
+        <button class="btn success" id="btnAplicarObjSize" style="margin-top:1rem;">✅ Aplicar tamaño</button>
+      `;
+    }
+
     case 'formato':
       return `
         ${Object.entries(CV.SHEET_SIZES).map(([key, s]) =>
@@ -104,8 +142,32 @@ function getPanelContent(name) {
               <option value="cm" selected>Centímetros (cm)</option>
             </select>
           </div>
+          <div class="check-row">
+            <input type="checkbox" id="mantenerRatio">
+            <label for="mantenerRatio">Mantener relación de aspecto</label>
+          </div>
           <button class="btn success" id="btnAplicarCustom">✅ Aplicar tamaño personalizado</button>
         </div>
+      `;
+
+    case 'margenes':
+      return `
+        <p style="font-size:0.8rem; color:var(--gray); margin-bottom:1rem;">
+          Los márgenes definen el área segura del lienzo. Se muestra con una línea punteada.
+        </p>
+        <div class="form-group">
+          <label>Margen (cm): <span id="margenVal">${CV.marginCm}</span></label>
+          <input type="range" id="margenSlider" min="0" max="5" step="0.1" value="${CV.marginCm}">
+        </div>
+        <div class="form-group">
+          <label>Margen exacto (cm)</label>
+          <input type="number" id="margenInput" value="${CV.marginCm}" min="0" max="10" step="0.1">
+        </div>
+        <div class="check-row">
+          <input type="checkbox" id="margenVisible" checked>
+          <label for="margenVisible">Mostrar guía visual</label>
+        </div>
+        <button class="btn success" id="btnAplicarMargen">✅ Aplicar</button>
       `;
 
     case 'fondo':
@@ -213,6 +275,7 @@ function getPanelContent(name) {
       `;
     }
 
+    // ✅ EFECTOS: sin botones, todo se aplica directamente
     case 'efectos':
       return `
         <div class="form-group">
@@ -222,7 +285,11 @@ function getPanelContent(name) {
             <input type="checkbox" id="fillTransparente">
             <label for="fillTransparente">Transparente</label>
           </div>
-          <button class="btn" id="btnAplicarFill" style="margin-top:0.5rem;">Aplicar relleno</button>
+        </div>
+        <hr style="margin:1rem 0; border:none; border-top:1px solid var(--border);">
+        <div class="form-group">
+          <label>Redondear esquinas: <span id="radioVal">0</span>px</label>
+          <input type="range" id="radioSlider" min="0" max="100" value="0">
         </div>
         <hr style="margin:1rem 0; border:none; border-top:1px solid var(--border);">
         <div class="form-group">
@@ -240,7 +307,6 @@ function getPanelContent(name) {
             <option value="dashed">Guiones</option>
             <option value="dotted">Puntos</option>
           </select>
-          <button class="btn" id="btnAplicarBorde" style="margin-top:0.5rem;">Aplicar borde</button>
         </div>
         <div class="form-group">
           <label>Sombra</label>
@@ -250,7 +316,6 @@ function getPanelContent(name) {
             <option value="hard">Dura</option>
             <option value="glow">Brillo</option>
           </select>
-          <button class="btn" id="btnAplicarSombra" style="margin-top:0.5rem;">Aplicar sombra</button>
         </div>
         <div class="form-group">
           <label>Opacidad: <span id="opacidadVal">100</span>%</label>
@@ -350,6 +415,54 @@ function getPanelContent(name) {
 function bindPanelEvents(name) {
   const content = document.getElementById('panelContent');
 
+  // ✅ PANEL: redimensionar objeto con combo
+  if (name === 'redimensionarObjeto') {
+    const wInput = document.getElementById('objW');
+    const hInput = document.getElementById('objH');
+    const ratioCheck = document.getElementById('objKeepRatio');
+    const preset = document.getElementById('objPreset');
+    let lastW = parseFloat(wInput?.value) || 5;
+    let lastH = parseFloat(hInput?.value) || 5;
+
+    // ✅ Al cambiar el combo, aplicar el tamaño predefinido
+    preset.onchange = () => {
+      const key = preset.value;
+      if (!key) return; // "Personalizado"
+      const size = CV.SHEET_SIZES[key];
+      if (!size) return;
+      wInput.value = size.w.toFixed(2);
+      hInput.value = size.h.toFixed(2);
+      lastW = size.w;
+      lastH = size.h;
+    };
+
+    wInput.oninput = () => {
+      preset.value = ''; // resetear combo
+      if (ratioCheck.checked) {
+        const ratio = lastH / lastW;
+        hInput.value = (parseFloat(wInput.value) * ratio).toFixed(2);
+      }
+      lastW = parseFloat(wInput.value) || 1;
+      lastH = parseFloat(hInput.value) || 1;
+    };
+    hInput.oninput = () => {
+      preset.value = '';
+      if (ratioCheck.checked) {
+        const ratio = lastW / lastH;
+        wInput.value = (parseFloat(hInput.value) * ratio).toFixed(2);
+      }
+      lastW = parseFloat(wInput.value) || 1;
+      lastH = parseFloat(hInput.value) || 1;
+    };
+
+    document.getElementById('btnAplicarObjSize').onclick = () => {
+      const w = parseFloat(wInput.value) || 5;
+      const h = parseFloat(hInput.value) || 5;
+      CV.resizeActiveObject(w, h, ratioCheck.checked);
+      alert('✅ Objeto redimensionado a ' + w + ' × ' + h + ' cm');
+    };
+  }
+
   if (name === 'formato') {
     content.querySelectorAll('[data-size]').forEach(btn => {
       btn.onclick = () => {
@@ -363,16 +476,60 @@ function bindPanelEvents(name) {
         }
       };
     });
+    const wInput = document.getElementById('customW');
+    const hInput = document.getElementById('customH');
+    const ratioCheck = document.getElementById('mantenerRatio');
+    let lastW = parseFloat(wInput?.value) || 21;
+    let lastH = parseFloat(hInput?.value) || 29.7;
+    if (wInput && hInput && ratioCheck) {
+      wInput.oninput = () => {
+        if (ratioCheck.checked) {
+          const ratio = lastH / lastW;
+          hInput.value = (parseFloat(wInput.value) * ratio).toFixed(2);
+        }
+        lastW = parseFloat(wInput.value) || 1;
+        lastH = parseFloat(hInput.value) || 1;
+      };
+      hInput.oninput = () => {
+        if (ratioCheck.checked) {
+          const ratio = lastW / lastH;
+          wInput.value = (parseFloat(hInput.value) * ratio).toFixed(2);
+        }
+        lastW = parseFloat(wInput.value) || 1;
+        lastH = parseFloat(hInput.value) || 1;
+      };
+    }
     const btnCustom = document.getElementById('btnAplicarCustom');
     if (btnCustom) {
       btnCustom.onclick = () => {
-        const w = parseFloat(document.getElementById('customW').value) || 21;
-        const h = parseFloat(document.getElementById('customH').value) || 29.7;
+        const w = parseFloat(wInput.value) || 21;
+        const h = parseFloat(hInput.value) || 29.7;
         const unit = document.getElementById('customUnit').value;
         CV.setCustomSize(w, h, unit);
         closePanel();
       };
     }
+  }
+
+  if (name === 'margenes') {
+    const slider = document.getElementById('margenSlider');
+    const input = document.getElementById('margenInput');
+    const val = document.getElementById('margenVal');
+    const checkbox = document.getElementById('margenVisible');
+
+    slider.oninput = () => {
+      val.textContent = slider.value;
+      input.value = slider.value;
+    };
+    input.oninput = () => {
+      val.textContent = input.value;
+      slider.value = input.value;
+    };
+    checkbox.onchange = () => CV.toggleMarginGuide(checkbox.checked);
+    document.getElementById('btnAplicarMargen').onclick = () => {
+      CV.setMarginCm(parseFloat(input.value) || 0);
+      alert('✅ Margen aplicado: ' + CV.marginCm + ' cm');
+    };
   }
 
   if (name === 'fondo') {
@@ -482,29 +639,52 @@ function bindPanelEvents(name) {
     });
   }
 
+  // ✅ EFECTOS: aplicar directamente sin botones
   if (name === 'efectos') {
-    document.getElementById('fillTransparente').onchange = (e) => {
-      document.getElementById('fillColor').disabled = e.target.checked;
+    const fillColor = document.getElementById('fillColor');
+    const fillTransparente = document.getElementById('fillTransparente');
+    const radioSlider = document.getElementById('radioSlider');
+    const bordeSin = document.getElementById('bordeSin');
+    const bordeGrosor = document.getElementById('bordeGrosor');
+    const bordeColor = document.getElementById('bordeColor');
+    const bordeEstilo = document.getElementById('bordeEstilo');
+    const sombraTipo = document.getElementById('sombraTipo');
+    const opacidad = document.getElementById('opacidad');
+
+    // ✅ Relleno
+    fillColor.oninput = () => {
+      if (!fillTransparente.checked) CV.setFillColor(fillColor.value);
     };
-    document.getElementById('bordeSin').onchange = (e) => {
-      document.getElementById('bordeGrosor').disabled = e.target.checked;
-      document.getElementById('bordeColor').disabled = e.target.checked;
-      document.getElementById('bordeEstilo').disabled = e.target.checked;
+    fillTransparente.onchange = () => {
+      fillColor.disabled = fillTransparente.checked;
+      if (fillTransparente.checked) CV.setFillColor('transparent');
+      else CV.setFillColor(fillColor.value);
     };
-    document.getElementById('btnAplicarFill').onclick = () => {
-      if (document.getElementById('fillTransparente').checked) CV.setFillColor('transparent');
-      else CV.setFillColor(document.getElementById('fillColor').value);
+
+    // ✅ Redondear esquinas
+    radioSlider.oninput = (e) => {
+      document.getElementById('radioVal').textContent = e.target.value;
+      CV.setCornerRadius(parseInt(e.target.value));
     };
-    document.getElementById('btnAplicarBorde').onclick = () => {
-      if (document.getElementById('bordeSin').checked) CV.applyBorder(0);
-      else CV.applyBorder(
-        parseInt(document.getElementById('bordeGrosor').value),
-        document.getElementById('bordeColor').value,
-        document.getElementById('bordeEstilo').value
-      );
+
+    // ✅ Borde
+    bordeSin.onchange = () => {
+      const disabled = bordeSin.checked;
+      bordeGrosor.disabled = disabled;
+      bordeColor.disabled = disabled;
+      bordeEstilo.disabled = disabled;
+      if (disabled) CV.applyBorder(0);
+      else CV.applyBorder(parseInt(bordeGrosor.value), bordeColor.value, bordeEstilo.value);
     };
-    document.getElementById('btnAplicarSombra').onclick = () => CV.applyShadow(document.getElementById('sombraTipo').value);
-    document.getElementById('opacidad').oninput = (e) => {
+    bordeGrosor.oninput = () => CV.applyBorder(parseInt(bordeGrosor.value), bordeColor.value, bordeEstilo.value);
+    bordeColor.oninput = () => CV.applyBorder(parseInt(bordeGrosor.value), bordeColor.value, bordeEstilo.value);
+    bordeEstilo.onchange = () => CV.applyBorder(parseInt(bordeGrosor.value), bordeColor.value, bordeEstilo.value);
+
+    // ✅ Sombra
+    sombraTipo.onchange = () => CV.applyShadow(sombraTipo.value);
+
+    // ✅ Opacidad
+    opacidad.oninput = (e) => {
       document.getElementById('opacidadVal').textContent = e.target.value;
       CV.setOpacity(e.target.value / 100);
     };
@@ -625,7 +805,6 @@ function download(dataURL, filename) {
   a.click();
 }
 
-// ===== BARRA FLOTANTE INFERIOR =====
 export function bindActionBar() {
   document.querySelectorAll('.floating-bar-actions button').forEach(btn => {
     btn.onclick = () => {
@@ -639,13 +818,20 @@ export function bindActionBar() {
       if (a === 'voltear-h') CV.flipActive('h');
       if (a === 'voltear-v') CV.flipActive('v');
       if (a === 'recortar') TOOLS.openCropModal();
+      if (a === 'redimensionar') {
+        if (!CV.canvas.getActiveObject()) {
+          alert('Selecciona un objeto primero');
+          return;
+        }
+        openPanel('redimensionarObjeto');
+      }
+      if (a === 'efectos') openPanel('efectos');
+      if (a === 'pegar') CV.pasteFromClipboard();
     };
   });
 }
 
-// ===== NAV BAR (superior derecha, arrastrable) =====
 export function bindNavBar() {
-  // Botones
   document.querySelectorAll('.nav-bar button').forEach(btn => {
     btn.onclick = () => {
       const a = btn.dataset.nav;
@@ -659,7 +845,6 @@ export function bindNavBar() {
     };
   });
 
-  // Hacer la barra arrastrable
   const bar = document.getElementById('navBar');
   const handle = document.getElementById('navDragHandle');
   if (!bar || !handle) return;

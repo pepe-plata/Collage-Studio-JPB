@@ -15,7 +15,8 @@ window.addEventListener('DOMContentLoaded', () => {
   }, 1500);
 
   CV.initCanvas();
-  CV.initWorkspacePinch();   // ✅ Pinch en todo el workspace
+  CV.initWorkspacePinch();
+  CV.initPasteShortcut();   // ✅ Ctrl+V
 
   const btnMenu = document.getElementById('btnMenu');
   const sideMenu = document.getElementById('sideMenu');
@@ -46,7 +47,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
   bindKeyboard();
 
-  // Zoom con Shift + scroll
   const workspace = document.getElementById('workspace');
   workspace.addEventListener('wheel', (e) => {
     if (e.shiftKey) {

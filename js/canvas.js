@@ -17,13 +17,21 @@ export const SHEET_SIZES = {
 };
 
 export const PX_PER_CM = 37.795;
+const SNAP_THRESHOLD = 8;
 
 export let canvas = null;
 export let currentSize = { w: 21.59, h: 27.94 };
 export let currentKey = 'Carta';
 export let currentZoom = 1;
+export let marginCm = 0.6;
+export let marginPx = marginCm * PX_PER_CM;
 
 let dimensionOverlay = null;
+let rulerH = null;
+let rulerV = null;
+let rulerCorner = null;
+let snapLines = { v: null, h: null };
+let marginGuide = null;
 
 // ===== INIT =====
 export function initCanvas() {
@@ -34,9 +42,14 @@ export function initCanvas() {
   });
 
   initOverlay();
-  initFabricEvents();
+  setTimeout(() => {
+    initRulers();
+    initMarginGuide();
+    initSnapLines();
+    setSheetSize('Carta');
+  }, 100);
 
-  setSheetSize('Carta');
+  initFabricEvents();
   return canvas;
 }
 
@@ -58,21 +71,17 @@ export function updateDimensionOverlay() {
     dimensionOverlay.classList.add('hidden');
     return;
   }
-
   const wCm = (obj.width * obj.scaleX) / PX_PER_CM;
   const hCm = (obj.height * obj.scaleY) / PX_PER_CM;
   dimensionOverlay.textContent = `${wCm.toFixed(2)} × ${hCm.toFixed(2)} cm`;
   dimensionOverlay.classList.remove('hidden');
 
-  // ✅ getBoundingRect(true, true) → coords absolutas del objeto (sin controles)
   const bound = obj.getBoundingRect(true, true);
   const canvasEl = canvas.upperCanvasEl;
   const canvasRect = canvasEl.getBoundingClientRect();
   const zoom = currentZoom;
 
-  // Centro horizontal del objeto
   const centerX = canvasRect.left + (bound.left + bound.width / 2) * zoom;
-  // Borde inferior interno (12px arriba del borde para que quede DENTRO)
   const bottomY = canvasRect.top + (bound.top + bound.height) * zoom - 12;
 
   dimensionOverlay.style.left = centerX + 'px';
@@ -83,15 +92,234 @@ export function hideDimensionOverlay() {
   if (dimensionOverlay) dimensionOverlay.classList.add('hidden');
 }
 
+// ===== REGLAS =====
+function initRulers() {
+  const container = document.querySelector('.canvas-container');
+  if (!container) return;
+
+  rulerH = document.createElement('div');
+  rulerH.className = 'ruler ruler-h';
+  container.appendChild(rulerH);
+
+  rulerV = document.createElement('div');
+  rulerV.className = 'ruler ruler-v';
+  container.appendChild(rulerV);
+
+  rulerCorner = document.createElement('div');
+  rulerCorner.className = 'ruler-corner';
+  container.appendChild(rulerCorner);
+}
+
+export function updateRulers() {
+  if (!rulerH || !rulerV) return;
+
+  const wPx = canvas.width;
+  const hPx = canvas.height;
+  const pxPerCm = PX_PER_CM;
+
+  rulerH.innerHTML = '';
+  rulerV.innerHTML = '';
+  rulerH.style.width = wPx + 'px';
+  rulerV.style.height = hPx + 'px';
+
+  for (let cm = 0; cm <= currentSize.w + 0.5; cm += 0.5) {
+    const x = cm * pxPerCm;
+    if (x > wPx + 1) break;
+    const isMajor = Math.abs(cm - Math.round(cm)) < 0.01;
+    const tick = document.createElement('div');
+    tick.className = `ruler-tick ${isMajor ? 'major' : 'minor'}`;
+    tick.style.left = x + 'px';
+    rulerH.appendChild(tick);
+    if (isMajor) {
+      const label = document.createElement('div');
+      label.className = 'ruler-label';
+      label.style.left = x + 'px';
+      label.textContent = Math.round(cm);
+      rulerH.appendChild(label);
+    }
+  }
+
+  for (let cm = 0; cm <= currentSize.h + 0.5; cm += 0.5) {
+    const y = cm * pxPerCm;
+    if (y > hPx + 1) break;
+    const isMajor = Math.abs(cm - Math.round(cm)) < 0.01;
+    const tick = document.createElement('div');
+    tick.className = `ruler-tick ${isMajor ? 'major' : 'minor'}`;
+    tick.style.top = y + 'px';
+    rulerV.appendChild(tick);
+    if (isMajor) {
+      const label = document.createElement('div');
+      label.className = 'ruler-label';
+      label.style.top = y + 'px';
+      label.textContent = Math.round(cm);
+      rulerV.appendChild(label);
+    }
+  }
+}
+
+// ===== GUÍA DE MARGEN =====
+function initMarginGuide() {
+  const container = document.querySelector('.canvas-container');
+  if (!container) return;
+  marginGuide = document.createElement('div');
+  marginGuide.className = 'margin-guide';
+  marginGuide.style.display = 'none';
+  container.appendChild(marginGuide);
+}
+
+export function updateMarginGuide() {
+  if (!marginGuide) return;
+  const m = marginPx;
+  marginGuide.style.display = 'block';
+  marginGuide.style.left = m + 'px';
+  marginGuide.style.top = m + 'px';
+  marginGuide.style.width = Math.max(0, canvas.width - 2 * m) + 'px';
+  marginGuide.style.height = Math.max(0, canvas.height - 2 * m) + 'px';
+}
+
+// ===== SNAP LINES =====
+function initSnapLines() {
+  const container = document.querySelector('.canvas-container');
+  if (!container) return;
+  snapLines.v = document.createElement('div');
+  snapLines.v.className = 'snap-line vertical';
+  snapLines.v.style.display = 'none';
+  container.appendChild(snapLines.v);
+
+  snapLines.h = document.createElement('div');
+  snapLines.h.className = 'snap-line horizontal';
+  snapLines.h.style.display = 'none';
+  container.appendChild(snapLines.h);
+}
+
+function showSnapLine(axis, positionPx) {
+  const line = snapLines[axis];
+  if (!line) return;
+  line.style.display = 'block';
+  line.classList.add('active');
+  if (axis === 'v') line.style.left = positionPx + 'px';
+  else line.style.top = positionPx + 'px';
+}
+
+function hideSnapLines() {
+  if (snapLines.v) snapLines.v.classList.remove('active');
+  if (snapLines.h) snapLines.h.classList.remove('active');
+}
+
+// ===== SNAP MAGNÉTICO =====
+function applySnap(obj) {
+  const objBound = obj.getBoundingRect(true, true);
+  const zoom = currentZoom;
+  const threshold = SNAP_THRESHOLD / zoom;
+
+  const objLeft = objBound.left;
+  const objRight = objBound.left + objBound.width;
+  const objTop = objBound.top;
+  const objBottom = objBound.top + objBound.height;
+  const objCenterX = objBound.left + objBound.width / 2;
+  const objCenterY = objBound.top + objBound.height / 2;
+
+  const refPoints = {
+    left: [0, marginPx],
+    right: [canvas.width, canvas.width - marginPx],
+    centerX: [canvas.width / 2],
+    top: [0, marginPx],
+    bottom: [canvas.height, canvas.height - marginPx],
+    centerY: [canvas.height / 2]
+  };
+
+  let snapped = false;
+
+  for (const refX of refPoints.left) {
+    if (Math.abs(objLeft - refX) < threshold) {
+      obj.set('left', obj.left - (objLeft - refX) / zoom);
+      showSnapLine('v', refX);
+      snapped = true;
+      break;
+    }
+  }
+  if (!snapped) {
+    for (const refX of refPoints.right) {
+      if (Math.abs(objRight - refX) < threshold) {
+        obj.set('left', obj.left - (objRight - refX) / zoom);
+        showSnapLine('v', refX);
+        snapped = true;
+        break;
+      }
+    }
+  }
+  if (!snapped) {
+    for (const refX of refPoints.centerX) {
+      if (Math.abs(objCenterX - refX) < threshold) {
+        obj.set('left', obj.left - (objCenterX - refX) / zoom);
+        showSnapLine('v', refX);
+        snapped = true;
+        break;
+      }
+    }
+  }
+
+  snapped = false;
+  for (const refY of refPoints.top) {
+    if (Math.abs(objTop - refY) < threshold) {
+      obj.set('top', obj.top - (objTop - refY) / zoom);
+      showSnapLine('h', refY);
+      snapped = true;
+      break;
+    }
+  }
+  if (!snapped) {
+    for (const refY of refPoints.bottom) {
+      if (Math.abs(objBottom - refY) < threshold) {
+        obj.set('top', obj.top - (objBottom - refY) / zoom);
+        showSnapLine('h', refY);
+        snapped = true;
+        break;
+      }
+    }
+  }
+  if (!snapped) {
+    for (const refY of refPoints.centerY) {
+      if (Math.abs(objCenterY - refY) < threshold) {
+        obj.set('top', obj.top - (objCenterY - refY) / zoom);
+        showSnapLine('h', refY);
+        snapped = true;
+        break;
+      }
+    }
+  }
+
+  obj.setCoords();
+}
+
 // ===== EVENTOS FABRIC =====
 function initFabricEvents() {
   canvas.on('selection:created', updateDimensionOverlay);
   canvas.on('selection:updated', updateDimensionOverlay);
   canvas.on('selection:cleared', hideDimensionOverlay);
-  canvas.on('object:moving', updateDimensionOverlay);
+  canvas.on('object:moving', (e) => {
+    if (e.target) applySnap(e.target);
+    updateDimensionOverlay();
+  });
   canvas.on('object:scaling', updateDimensionOverlay);
   canvas.on('object:rotating', updateDimensionOverlay);
-  canvas.on('object:modified', updateDimensionOverlay);
+  canvas.on('object:modified', () => {
+    hideSnapLines();
+    updateDimensionOverlay();
+  });
+  canvas.on('mouse:up', hideSnapLines);
+}
+
+// ===== MÁRGENES =====
+export function setMarginCm(cm) {
+  marginCm = Math.max(0, cm);
+  marginPx = marginCm * PX_PER_CM;
+  updateMarginGuide();
+  updateCanvasInfo();
+}
+export function getMarginCm() { return marginCm; }
+export function toggleMarginGuide(show) {
+  if (marginGuide) marginGuide.style.display = show ? 'block' : 'none';
 }
 
 // ===== ZOOM =====
@@ -99,99 +327,77 @@ export function zoomIn() {
   const ws = document.getElementById('workspace');
   zoomAtPoint(currentZoom * 1.15, ws.clientWidth / 2, ws.clientHeight / 2);
 }
-
 export function zoomOut() {
   const ws = document.getElementById('workspace');
   zoomAtPoint(currentZoom / 1.15, ws.clientWidth / 2, ws.clientHeight / 2);
 }
-
 export function zoomFitToScreen() {
   const ws = document.getElementById('workspace');
   if (!ws) return;
-  const availW = ws.clientWidth - 40;
-  const availH = ws.clientHeight - 40;
+  const availW = ws.clientWidth - 120;
+  const availH = ws.clientHeight - 120;
   const fit = Math.min(availW / canvas.width, availH / canvas.height, 1);
   currentZoom = Math.max(fit, 0.1);
   applyZoom();
-  // Centrar scroll
   requestAnimationFrame(() => {
-    ws.scrollLeft = Math.max(0, (canvas.width * currentZoom - ws.clientWidth) / 2 + 20);
-    ws.scrollTop = Math.max(0, (canvas.height * currentZoom - ws.clientHeight) / 2 + 20);
+    ws.scrollLeft = Math.max(0, (canvas.width * currentZoom + 80 - ws.clientWidth) / 2 + 40);
+    ws.scrollTop = Math.max(0, (canvas.height * currentZoom + 80 - ws.clientHeight) / 2 + 40);
   });
 }
-
 export function zoomReset() { zoomFitToScreen(); }
-
 export function setZoom(z) {
   const ws = document.getElementById('workspace');
   zoomAtPoint(Math.max(0.1, Math.min(z, 5)), ws.clientWidth / 2, ws.clientHeight / 2);
 }
 
-// ✅ Zoom centrado en un punto del workspace
 function zoomAtPoint(newZoom, focalX, focalY) {
   newZoom = Math.max(0.1, Math.min(newZoom, 5));
   const ws = document.getElementById('workspace');
   if (!ws) return;
-
   const oldZoom = currentZoom;
   if (Math.abs(newZoom - oldZoom) < 0.001) return;
-
-  // Guardar la posición lógica del punto focal ANTES del zoom
   const focalCanvasX = (ws.scrollLeft + focalX) / oldZoom;
   const focalCanvasY = (ws.scrollTop + focalY) / oldZoom;
-
   currentZoom = newZoom;
   applyZoom();
-
-  // Restaurar el punto focal
   requestAnimationFrame(() => {
     ws.scrollLeft = focalCanvasX * newZoom - focalX;
     ws.scrollTop = focalCanvasY * newZoom - focalY;
   });
-
   updateCanvasInfo();
 }
 
-// ✅ Aplicar zoom con transform: scale
 function applyZoom() {
   const wrapper = document.getElementById('canvasWrapper');
   if (!wrapper) return;
-
   const container = wrapper.querySelector('.canvas-container');
   if (!container) return;
 
-  // El wrapper toma el tamaño escalado (para que el scroll funcione)
-  wrapper.style.width = (canvas.width * currentZoom) + 'px';
-  wrapper.style.height = (canvas.height * currentZoom) + 'px';
-  wrapper.style.margin = '20px auto';
+  // Espacio para reglas: 28px arriba y 28px a la izquierda
+  const RULER_SPACE = 28;
 
-  // El container se escala desde la esquina superior izquierda
+  wrapper.style.width = (canvas.width * currentZoom + RULER_SPACE) + 'px';
+  wrapper.style.height = (canvas.height * currentZoom + RULER_SPACE) + 'px';
+  wrapper.style.margin = '30px auto';
+
   container.style.transform = `scale(${currentZoom})`;
   container.style.transformOrigin = 'top left';
   container.style.width = canvas.width + 'px';
   container.style.height = canvas.height + 'px';
+  container.style.marginLeft = RULER_SPACE + 'px';
+  container.style.marginTop = RULER_SPACE + 'px';
 
   updateCanvasInfo();
+  updateRulers();
+  updateMarginGuide();
   updateDimensionOverlay();
 }
 
 // ===== PAN =====
-export function panUp() {
-  const ws = document.getElementById('workspace');
-  ws.scrollBy({ top: -150, behavior: 'smooth' });
-}
-export function panDown() {
-  const ws = document.getElementById('workspace');
-  ws.scrollBy({ top: 150, behavior: 'smooth' });
-}
-export function panLeft() {
-  const ws = document.getElementById('workspace');
-  ws.scrollBy({ left: -150, behavior: 'smooth' });
-}
-export function panRight() {
-  const ws = document.getElementById('workspace');
-  ws.scrollBy({ left: 150, behavior: 'smooth' });
-}
+export function panUp() { document.getElementById('workspace').scrollBy({ top: -150, behavior: 'smooth' }); }
+export function panDown() { document.getElementById('workspace').scrollBy({ top: 150, behavior: 'smooth' }); }
+export function panLeft() { document.getElementById('workspace').scrollBy({ left: -150, behavior: 'smooth' }); }
+export function panRight() { document.getElementById('workspace').scrollBy({ left: 150, behavior: 'smooth' }); }
 
 // ===== INFO =====
 export function updateCanvasInfo() {
@@ -201,9 +407,8 @@ export function updateCanvasInfo() {
   if (currentKey === 'Personalizado') {
     label = `Personalizado ${currentSize.w.toFixed(1)} × ${currentSize.h.toFixed(1)} cm`;
   }
-  el.textContent = `${label} · Zoom ${Math.round(currentZoom * 100)}%`;
+  el.textContent = `${label} · Márgenes ${marginCm} cm · Zoom ${Math.round(currentZoom * 100)}%`;
 }
-
 export function updateObjectInfo() { updateDimensionOverlay(); }
 
 // ===== HANDLES =====
@@ -220,7 +425,7 @@ function applyCanvaHandles(obj) {
   obj.setControlsVisibility({ mt: true, mb: true, ml: true, mr: true, mtr: true });
 }
 
-// ===== TAMAÑO =====
+// ===== TAMAÑO HOJA =====
 export function setSheetSize(key, customSize = null) {
   if (key === 'Personalizado' && customSize) {
     currentKey = 'Personalizado';
@@ -237,9 +442,45 @@ export function setSheetSize(key, customSize = null) {
   canvas.setHeight(hPx);
   currentZoom = 1;
   applyZoom();
+  updateRulers();
+  updateMarginGuide();
   setTimeout(() => zoomFitToScreen(), 50);
   canvas.renderAll();
   updateCanvasInfo();
+}
+
+// ✅ CAMBIAR TAMAÑO DEL OBJETO SELECCIONADO
+export function resizeActiveObject(widthCm, heightCm, keepRatio = false) {
+  const obj = canvas.getActiveObject();
+  if (!obj) { alert('Selecciona un objeto primero'); return; }
+
+  const currentWidthCm = (obj.width * obj.scaleX) / PX_PER_CM;
+  const currentHeightCm = (obj.height * obj.scaleY) / PX_PER_CM;
+
+  let newScaleX = (widthCm * PX_PER_CM) / obj.width;
+  let newScaleY = (heightCm * PX_PER_CM) / obj.height;
+
+  if (keepRatio) {
+    const ratioW = widthCm / currentWidthCm;
+    const ratioH = heightCm / currentHeightCm;
+    const ratio = Math.min(ratioW, ratioH);
+    newScaleX = obj.scaleX * ratio;
+    newScaleY = obj.scaleY * ratio;
+  }
+
+  obj.set({ scaleX: newScaleX, scaleY: newScaleY });
+  obj.setCoords();
+  canvas.renderAll();
+  updateDimensionOverlay();
+}
+
+export function getActiveObjectSizeCm() {
+  const obj = canvas.getActiveObject();
+  if (!obj) return null;
+  return {
+    w: (obj.width * obj.scaleX) / PX_PER_CM,
+    h: (obj.height * obj.scaleY) / PX_PER_CM
+  };
 }
 
 // ===== AGREGAR =====
@@ -407,12 +648,16 @@ export function newProject() {
   canvas.setBackgroundImage(null, () => {});
   currentKey = 'Carta';
   currentSize = { w: 21.59, h: 27.94 };
+  marginCm = 0.6;
+  marginPx = marginCm * PX_PER_CM;
   const wPx = Math.round(currentSize.w * PX_PER_CM);
   const hPx = Math.round(currentSize.h * PX_PER_CM);
   canvas.setWidth(wPx);
   canvas.setHeight(hPx);
   currentZoom = 1;
   applyZoom();
+  updateRulers();
+  updateMarginGuide();
   setTimeout(() => zoomFitToScreen(), 50);
   canvas.renderAll();
   updateCanvasInfo();
@@ -439,14 +684,8 @@ export function deleteActive() {
   hideDimensionOverlay();
   canvas.renderAll();
 }
-export function bringForward() {
-  const o = canvas.getActiveObject();
-  if (o) { canvas.bringForward(o); canvas.renderAll(); }   // ✅ una capa adelante
-}
-export function sendBackward() {
-  const o = canvas.getActiveObject();
-  if (o) { canvas.sendBackwards(o); canvas.renderAll(); }  // ✅ una capa atrás
-}
+export function bringForward() { const o = canvas.getActiveObject(); if (o) { canvas.bringForward(o); canvas.renderAll(); } }
+export function sendBackward() { const o = canvas.getActiveObject(); if (o) { canvas.sendBackwards(o); canvas.renderAll(); } }
 export function centerActive() {
   const o = canvas.getActiveObject();
   if (!o) return;
@@ -507,6 +746,85 @@ export function toggleStrike() { const o = canvas.getActiveObject(); if (o) { o.
 export function setFontFamily(f) { const o = canvas.getActiveObject(); if (o) { o.set('fontFamily', f); canvas.renderAll(); } }
 export function setFontSize(s) { const o = canvas.getActiveObject(); if (o) { o.set('fontSize', s); canvas.renderAll(); } }
 
+// ✅ REDONDEAR ESQUINAS (corregido, sin borrar la imagen)
+export function setCornerRadius(radius) {
+  const o = canvas.getActiveObject();
+  if (!o) return;
+  radius = Math.max(0, Math.min(radius, 100));
+
+  // Si es un Rect nativo, aplicar rx/ry directamente
+  if (o.type === 'rect') {
+    o.set({ rx: radius, ry: radius });
+    canvas.renderAll();
+    return;
+  }
+
+  // ✅ Para imágenes y otros objetos, usar clipPath RELATIVO al objeto
+  // (sin absolutePositioned, con las dimensiones del objeto)
+  if (radius === 0) {
+    o.set('clipPath', null);
+  } else {
+    const w = o.width;
+    const h = o.height;
+    const clipRect = new fabric.Rect({
+      width: w,
+      height: h,
+      rx: radius,
+      ry: radius,
+      originX: 'center',
+      originY: 'center',
+      left: 0,
+      top: 0
+      // NO usar absolutePositioned
+    });
+    o.set('clipPath', clipRect);
+  }
+  canvas.renderAll();
+}
+
+// ===== PEGAR DESDE PORTAPAPELES =====
+export async function pasteFromClipboard() {
+  try {
+    if (!navigator.clipboard || !navigator.clipboard.read) {
+      alert('Tu navegador no soporta pegar desde el portapapeles. Usa Ctrl+V.');
+      return;
+    }
+    const items = await navigator.clipboard.read();
+    for (const item of items) {
+      for (const type of item.types) {
+        if (type.startsWith('image/')) {
+          const blob = await item.getType(type);
+          const reader = new FileReader();
+          reader.onload = (ev) => addImageFromDataURL(ev.target.result);
+          reader.readAsDataURL(blob);
+          return;
+        }
+      }
+    }
+    alert('No hay imágenes en el portapapeles');
+  } catch (err) {
+    console.error(err);
+    alert('No se pudo pegar. Verifica los permisos del portapapeles.\n\nTip: puedes usar Ctrl+V sobre el canvas.');
+  }
+}
+
+export function initPasteShortcut() {
+  document.addEventListener('paste', (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const blob = item.getAsFile();
+        const reader = new FileReader();
+        reader.onload = (ev) => addImageFromDataURL(ev.target.result);
+        reader.readAsDataURL(blob);
+        e.preventDefault();
+        return;
+      }
+    }
+  });
+}
+
 // ===== EXPORT =====
 export function exportPNG(multiplier = 2) { return canvas.toDataURL({ format: 'png', quality: 1, multiplier }); }
 export function exportJPG(multiplier = 2) { return canvas.toDataURL({ format: 'jpeg', quality: 0.95, multiplier }); }
@@ -530,15 +848,13 @@ export function setCustomSize(w, h, unit) {
   setSheetSize('Personalizado', { w: wCm, h: hCm });
 }
 
-// ===== PINCH ZOOM EN WORKSPACE =====
+// ===== PINCH ZOOM =====
 export function initWorkspacePinch() {
   const ws = document.getElementById('workspace');
   if (!ws) return;
-
   let pinchStartDist = 0;
   let pinchStartZoom = 1;
-  let focalX = 0;
-  let focalY = 0;
+  let focalX = 0, focalY = 0;
 
   function getDist(touches) {
     const [a, b] = touches;
