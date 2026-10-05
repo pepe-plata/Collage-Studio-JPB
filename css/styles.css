@@ -12,7 +12,9 @@
   --success: #16a34a;
   --border: #e2e8f0;
   --shadow: 0 4px 12px rgba(0,0,0,0.08);
-  --workspace-bg: rgb(227, 228, 232);
+  --workspace-bg: rgb(240, 240, 240);       /* ✅ NUEVO */
+  --canvas-border: rgb(198, 198, 198);       /* ✅ NUEVO */
+  --ruler-offset: 28px;                       /* ✅ Separación de reglas */
 }
 
 html, body {
@@ -59,10 +61,13 @@ body { display: flex; flex-direction: column; height: 100vh; }
 .header-actions { display: flex; gap: 0.3rem; }
 .icon-btn {
   background: rgba(255,255,255,0.15); border: none; color: white;
-  font-size: 1.1rem; padding: 0.4rem 0.6rem; border-radius: 8px; cursor: pointer;
+  font-size: 1.1rem; padding: 0.35rem; border-radius: 8px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  min-width: 36px; min-height: 36px;
 }
 .icon-btn:active { background: rgba(255,255,255,0.3); }
 .icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.icon-btn img { width: 20px; height: 20px; object-fit: contain; filter: brightness(0) invert(1); }
 
 /* ===== MENÚ LATERAL ===== */
 .side-menu {
@@ -89,7 +94,7 @@ body { display: flex; flex-direction: column; height: 100vh; }
 .side-menu li.active { background: #e0e7ff; border-left-color: var(--primary); font-weight: 600; }
 .side-menu li .menu-icon { width: 18px; height: 18px; object-fit: contain; flex-shrink: 0; }
 
-/* ===== WORKSPACE (fix centrado Android) ===== */
+/* ===== WORKSPACE ===== */
 .workspace {
   flex: 1;
   min-height: 0;
@@ -98,6 +103,7 @@ body { display: flex; flex-direction: column; height: 100vh; }
   position: relative;
   -webkit-overflow-scrolling: touch;
   display: block;
+  padding: 40px;
 }
 
 .canvas-wrapper {
@@ -108,15 +114,108 @@ body { display: flex; flex-direction: column; height: 100vh; }
   transform-origin: top left;
 }
 
+/* ✅ El canvas-container es el padre de las reglas y guía */
 .canvas-container {
-  box-shadow: 0 10px 40px rgba(0,0,0,0.15) !important;
-  border-radius: 4px;
+  position: relative !important;
   overflow: visible !important;
+  border: 1px solid var(--canvas-border) !important;  /* ✅ NUEVO: borde gris */
+  box-shadow: 0 10px 40px rgba(0,0,0,0.15) !important;
+  border-radius: 2px;
 }
 
 canvas { touch-action: none; }
 
-/* ===== BARRA NAV SUPERIOR DERECHA ===== */
+/* ===== REGLAS FUERA DEL CANVAS ===== */
+.ruler {
+  position: absolute;
+  background: rgba(255,255,255,0.98);
+  border: 1px solid #cbd5e1;
+  pointer-events: none;
+  z-index: 10;
+  font-size: 8px;
+  color: #64748b;
+  overflow: hidden;
+}
+
+/* Regla horizontal: arriba del canvas, separación de 6px */
+.ruler-h {
+  top: calc(-1 * var(--ruler-offset));
+  left: 0;
+  right: 0;
+  height: 22px;
+  border-radius: 3px 3px 0 0;
+}
+
+/* Regla vertical: izquierda del canvas, separación de 6px */
+.ruler-v {
+  top: 0;
+  left: calc(-1 * var(--ruler-offset));
+  bottom: 0;
+  width: 22px;
+  border-radius: 3px 0 0 3px;
+}
+
+/* Esquina superior izquierda (cuadro de intersección) */
+.ruler-corner {
+  position: absolute;
+  top: calc(-1 * var(--ruler-offset));
+  left: calc(-1 * var(--ruler-offset));
+  width: var(--ruler-offset);
+  height: 22px;
+  background: transparent;
+  z-index: 11;
+  pointer-events: none;
+}
+
+/* Separación real entre el canvas y las reglas:
+   la regla está a 28px del borde, y ocupa 22px, así que quedan 6px libres */
+.ruler-h { padding-bottom: 6px; }
+.ruler-v { padding-right: 6px; }
+
+.ruler-tick {
+  position: absolute;
+  background: #94a3b8;
+}
+.ruler-tick.major { background: #475569; }
+.ruler-label {
+  position: absolute;
+  font-size: 7px;
+  color: #475569;
+  line-height: 1;
+}
+.ruler-h .ruler-tick { bottom: 0; width: 1px; }
+.ruler-h .ruler-tick.major { height: 10px; }
+.ruler-h .ruler-tick.minor { height: 5px; }
+.ruler-h .ruler-label { bottom: 10px; transform: translateX(-50%); }
+
+.ruler-v .ruler-tick { right: 0; height: 1px; }
+.ruler-v .ruler-tick.major { width: 10px; }
+.ruler-v .ruler-tick.minor { width: 5px; }
+.ruler-v .ruler-label { right: 10px; transform: translateY(-50%) rotate(-90deg); transform-origin: center; }
+
+/* ===== GUÍA DE MARGEN ===== */
+.margin-guide {
+  position: absolute;
+  border: 1px dashed rgba(79, 70, 229, 0.5);
+  pointer-events: none;
+  z-index: 5;
+  border-radius: 2px;
+}
+
+/* ===== SNAP LINES ===== */
+.snap-line {
+  position: absolute;
+  background: #ec4899;
+  pointer-events: none;
+  z-index: 20;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+.snap-line.active { opacity: 1; }
+.snap-line.vertical { width: 1px; top: 0; bottom: 0; }
+.snap-line.horizontal { height: 1px; left: 0; right: 0; }
+
+/* ===== BARRA NAV ===== */
 .nav-bar {
   position: fixed;
   top: 70px;
@@ -129,7 +228,6 @@ canvas { touch-action: none; }
   user-select: none;
   touch-action: none;
 }
-
 .nav-drag-handle {
   height: 16px;
   background: var(--primary);
@@ -142,22 +240,16 @@ canvas { touch-action: none; }
   font-size: 12px;
   letter-spacing: 2px;
   margin-bottom: 4px;
-  padding: 0;
   line-height: 1;
 }
 .nav-drag-handle:active { cursor: grabbing; }
-
-.nav-bar.dragging {
-  box-shadow: 0 12px 40px rgba(79,70,229,0.4);
-}
-
+.nav-bar.dragging { box-shadow: 0 12px 40px rgba(79,70,229,0.4); }
 .nav-grid {
   display: grid;
   grid-template-columns: repeat(3, 44px);
   grid-template-rows: repeat(3, 44px);
   gap: 4px;
 }
-
 .nav-bar button {
   background: var(--light);
   border: none;
@@ -177,10 +269,7 @@ canvas { touch-action: none; }
   object-fit: contain;
   pointer-events: none;
 }
-.nav-empty {
-  background: transparent;
-  pointer-events: none;
-}
+.nav-empty { background: transparent; pointer-events: none; }
 
 /* ===== BARRA FLOTANTE INFERIOR ===== */
 .floating-bar {
@@ -211,7 +300,7 @@ canvas { touch-action: none; }
 .floating-bar-actions button img { width: 22px; height: 22px; object-fit: contain; pointer-events: none; }
 .floating-bar-actions button span { font-size: 0.6rem; font-weight: 600; white-space: nowrap; }
 
-/* ===== OVERLAY DE DIMENSIONES ===== */
+/* ===== OVERLAY DIMENSIONES ===== */
 .dimension-overlay {
   position: fixed;
   background: rgba(0, 0, 0, 0.78);
@@ -325,6 +414,8 @@ canvas { touch-action: none; }
 /* ===== RESPONSIVE ===== */
 @media (max-width: 600px) {
   .app-header h1 { font-size: 0.85rem; }
+  .icon-btn { min-width: 32px; min-height: 32px; padding: 0.3rem; }
+  .icon-btn img { width: 18px; height: 18px; }
   .floating-bar-actions button { min-width: 46px; padding: 0.3rem; }
   .floating-bar-actions button img { width: 20px; height: 20px; }
   .floating-bar-actions button span { font-size: 0.55rem; }
@@ -335,4 +426,8 @@ canvas { touch-action: none; }
     grid-template-rows: repeat(3, 38px);
   }
   .nav-bar button img { width: 18px; height: 18px; }
+  .ruler { font-size: 7px; }
+  .ruler-h { height: 18px; }
+  .ruler-v { width: 18px; }
+  :root { --ruler-offset: 24px; }
 }
