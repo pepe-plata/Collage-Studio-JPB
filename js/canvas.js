@@ -912,42 +912,162 @@ export function setCustomSize(w, h, unit) {
   setSheetSize('Personalizado', { w: wCm, h: hCm });
 }
 
-// ===== PINCH ZOOM =====
+// ===== PINCH ZOOM & 2-FINGER PAN (estilo Canva) =====
 export function initWorkspacePinch() {
   const ws = document.getElementById('workspace');
   if (!ws) return;
-  let pinchStartDist = 0;
-  let pinchStartZoom = 1;
-  let focalX = 0, focalY = 0;
+
+  const gesture = {
+    active: false,
+    mode: null,              // 'zoom' | 'scroll-h' | 'scroll-v'
+    startDist: 0,
+    startMidX: 0,
+    startMidY: 0,
+    startZoom: 1,
+    startScrollLeft: 0,
+    startScrollTop: 0,
+    // Punto focal del zoom (fijo durante el gesto)
+    focalScreenX: 0,
+    focalScreenY: 0,
+    focalCanvasX: 0,
+    focalCanvasY: 0
+  };
 
   function getDist(touches) {
     const [a, b] = touches;
     return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
   }
 
+  function getMid(touches) {
+    const [a, b] = touches;
+    return {
+      x: (a.clientX + b.clientX) / 2,
+      y: (a.clientY + b.clientY) / 2
+    };
+  }
+
+  // ===== TOUCHSTART (captura) =====
   ws.addEventListener('touchstart', (e) => {
-    if (e.touches.length === 2) {
-      const rect = ws.getBoundingClientRect();
-      pinchStartDist = getDist(e.touches);
-      pinchStartZoom = currentZoom;
-      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      focalX = midX - rect.left;
-      focalY = midY - rect.top;
-    }
-  }, { passive: true });
-
-  ws.addEventListener('touchmove', (e) => {
-    if (e.touches.length === 2 && pinchStartDist > 0) {
+    // Si ya estamos interceptando, ignorar dedos nuevos
+    if (gesture.active) {
       e.preventDefault();
-      const dist = getDist(e.touches);
-      const scale = dist / pinchStartDist;
-      const newZoom = Math.max(0.1, Math.min(pinchStartZoom * scale, 5));
-      zoomAtPoint(newZoom, focalX, focalY);
+      e.stopPropagation();
+      return;
     }
-  }, { passive: false });
 
+    // Activar interceptación SOLO si hay 2+ dedos
+    if (e.touches.length >= 2) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const dist = getDist(e.touches);
+      const mid = getMid(e.touches);
+      const rect = ws.getBoundingClientRect();
+
+      gesture.active = true;
+      gesture.mode = null;
+      gesture.startDist = dist;
+      gesture.startMidX = mid.x;
+      gesture.startMidY = mid.y;
+      gesture.startZoom = currentZoom;
+      gesture.startScrollLeft = ws.scrollLeft;
+      gesture.startScrollTop = ws.scrollTop;
+
+      // Punto focal del zoom (pantalla)
+      gesture.focalScreenX = mid.x - rect.left;
+      gesture.focalScreenY = mid.y - rect.top;
+
+      // Punto focal en coordenadas del canvas (sin zoom)
+      gesture.focalCanvasX = (ws.scrollLeft + gesture.focalScreenX) / currentZoom;
+      gesture.focalCanvasY = (ws.scrollTop + gesture.focalScreenY) / currentZoom;
+    }
+  }, { capture: true, passive: false });
+
+  // ===== TOUCHMOVE (captura) =====
+  ws.addEventListener('touchmove', (e) => {
+    if (!gesture.active) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (e.touches.length < 2) return;
+
+    const dist = getDist(e.touches);
+    const mid = getMid(e.touches);
+    const dx = mid.x - gesture.startMidX;
+    const dy = mid.y - gesture.startMidY;
+    const dDist = dist - gesture.startDist;
+
+    // ✅ Decidir el modo la primera vez que hay movimiento significativo
+    if (!gesture.mode) {
+      const totalMove = Math.hypot(dx, dy);
+      const totalPinch = Math.abs(dDist);
+
+      if (totalMove < 10 && totalPinch < 10) return;   // Aún no es significativo
+
+      if (totalPinch > totalMove * 1.2) {
+        gesture.mode = 'zoom';
+      } else if (Math.abs(dx) > Math.abs(dy) * 1.2) {
+        gesture.mode = 'scroll-h';
+      } else if (Math.abs(dy) > Math.abs(dx) * 1.2) {
+        gesture.mode = 'scroll-v';
+      } else {
+        return;   // Movimiento ambiguo, esperar más
+      }
+    }
+
+    // ✅ Aplicar según el modo bloqueado
+    if (gesture.mode === 'zoom') {
+      const scale = dist / gesture.startDist;
+      const newZoom = Math.max(0.1, Math.min(gesture.startZoom * scale, 5));
+      applyPinchZoom(
+        newZoom,
+        gesture.focalScreenX,
+        gesture.focalScreenY,
+        gesture.focalCanvasX,
+        gesture.focalCanvasY
+      );
+    } else if (gesture.mode === 'scroll-h') {
+      ws.scrollLeft = gesture.startScrollLeft - dx;
+    } else if (gesture.mode === 'scroll-v') {
+      ws.scrollTop = gesture.startScrollTop - dy;
+    }
+  }, { capture: true, passive: false });
+
+  // ===== TOUCHEND (captura) =====
   ws.addEventListener('touchend', (e) => {
-    if (e.touches.length < 2) pinchStartDist = 0;
-  }, { passive: true });
+    if (!gesture.active) return;
+
+    // Bloquear el evento SOLO si aún hay dedos del gesto en pantalla
+    if (e.touches.length >= 1) {
+      e.stopPropagation();
+    }
+
+    // Si ya no hay dedos → fin del gesto
+    if (e.touches.length === 0) {
+      gesture.active = false;
+      gesture.mode = null;
+    }
+  }, { capture: true, passive: false });
+
+  // ===== TOUCHCANCEL =====
+  ws.addEventListener('touchcancel', () => {
+    gesture.active = false;
+    gesture.mode = null;
+  }, { capture: true });
+}
+
+// ✅ Zoom con punto focal fijo (uso interno de pinch)
+function applyPinchZoom(newZoom, focalScreenX, focalScreenY, focalCanvasX, focalCanvasY) {
+  const ws = document.getElementById('workspace');
+  if (!ws) return;
+
+  currentZoom = Math.max(0.1, Math.min(newZoom, 5));
+  applyZoom();
+
+  // Restaurar el punto focal para que no se mueva visualmente
+  ws.scrollLeft = focalCanvasX * currentZoom - focalScreenX;
+  ws.scrollTop = focalCanvasY * currentZoom - focalScreenY;
+
+  updateCanvasInfo();
 }
