@@ -39,22 +39,21 @@
   <nav class="side-menu" id="sideMenu">
     <div class="side-menu-header"><span>Herramientas</span></div>
     <ul>
-      <li data-panel="nuevo">✨ Nuevo</li>
-      <li data-panel="formato">📐 Cambiar Tamaño</li>
-      <li data-panel="margenes">📏 Márgenes</li>
-      <li data-panel="fondo">🖼️ Fondo</li>
+      <li data-panel="nuevo">✨ Nuevo Collage...</li>
+      <li data-panel="proyecto-abrir">📂 Abrir Proyecto</li>
+      <li data-panel="formato">📐 Configurar Página</li>
+      <li data-panel="fondo">🖼️ Fondo de Página...</li>
       <li data-panel="imagenes">📷 Insertar Imágenes...</li>
       <li data-panel="figuras">🔷 Figuras</li>
       <li data-panel="stickers">⭐ Stickers</li>
       <li data-panel="vector">🎨 Vectores</li>
       <li data-panel="texto">📝 Texto</li>
-      <li data-panel="efectos">✨ Efectos</li>
       <li data-panel="filtros">🎞️ Filtros</li>
-      <li data-panel="papel">📜 Papel</li>
+      <li data-panel="papel">📜 Efectos de papel</li>
       <li data-panel="mascaras">🎭 Máscaras</li>
-      <li data-panel="proyecto">💾 Proyecto</li>
+      <li data-panel="proyecto">💾 Guardar Proyecto</li>
       <li data-panel="exportar">📤 Exportar</li>
-      <li data-panel="ayuda"><img src="icons/help.png" alt="" class="menu-icon">Ayuda</li>
+      <li data-panel="ayuda"><img src="icons/help.png" alt="" class="menu-icon">Acerca de</li>
     </ul>
   </nav>
 
@@ -122,13 +121,23 @@
     <div class="panel-content" id="panelContent"></div>
   </aside>
 
+  <!-- MODAL DE RECORTE -->
   <div class="modal" id="cropModal">
-    <div class="modal-content">
-      <h3>✂️ Recortar imagen</h3>
-      <canvas id="cropCanvas"></canvas>
+    <div class="modal-content crop-content">
+      <div class="crop-header">
+        <h3>✂️ Recortar imagen</h3>
+        <p class="crop-hint">Arrastra el marco para elegir el área a conservar</p>
+      </div>
+      <div class="crop-canvas-wrapper">
+        <canvas id="cropCanvas"></canvas>
+      </div>
+      <div class="crop-info">
+        <span id="cropSize">—</span>
+      </div>
       <div class="modal-actions">
+        <button class="btn secondary" id="cropReset">🔄 Reiniciar</button>
         <button class="btn secondary" id="cropCancel">Cancelar</button>
-        <button class="btn success" id="cropApply">Aplicar</button>
+        <button class="btn success" id="cropApply">✅ Aplicar recorte</button>
       </div>
     </div>
   </div>
