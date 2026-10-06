@@ -3,17 +3,19 @@
 // ============================================
 
 export const SHEET_SIZES = {
-  'MediaCarta':   { w: 21.59, h: 13.97, label: 'Media Carta 21.59 × 13.97 cm (8.5" × 5.5")' },
-  'Carta':        { w: 21.59, h: 27.94, label: 'Carta (Letter) 21.59 × 27.94 cm (8.5" × 11")' },
-  'Oficio':       { w: 21.59, h: 35.56, label: 'Oficio / Legal 21.59 × 35.56 cm (8.5" × 14")' },
-  'A4':           { w: 21,    h: 29.7,  label: 'A4 21 × 29.7 cm (8.27" × 11.69")' },
-  'DobleCarta':   { w: 43.18, h: 27.94, label: 'Doble Carta 43.18 × 27.94 cm (17" × 11")' },
-  'Tabloide':     { w: 27.94, h: 43.18, label: 'Tabloide 27.94 × 43.18 cm (11" × 17")' },
-  'FotoInfantil': { w: 2.5,   h: 3.0,   label: 'Foto infantil 2.5 × 3.0 cm' },
-  'FotoPostal':   { w: 10.2,  h: 15.2,  label: 'Foto Postal 10.2 × 15.2 cm (4" × 6")' },
-  'Foto5x7':      { w: 12.7,  h: 17.8,  label: '12.7 × 17.8 cm (5" × 7")' },
-  'Foto6x8':      { w: 15.24, h: 20.32, label: '15.24 × 20.32 cm (6" × 8")' },
-  'Foto8x10':     { w: 20.32, h: 25.4,  label: '20.32 × 25.4 cm (8" × 10")' }
+  'MediaCarta':       { w: 21.59, h: 13.97, label: 'Media Carta 21.59 × 13.97 cm (8.5" × 5.5")' },
+  'Carta':            { w: 21.59, h: 27.94, label: 'Carta (Letter) 21.59 × 27.94 cm (8.5" × 11")' },
+  'CartaHorizontal':  { w: 27.94, h: 21.59, label: 'Carta Horizontal 27.94 × 21.59 cm (11" × 8.5")' }, /* ✅ NUEVO */
+  'Oficio':           { w: 21.59, h: 35.56, label: 'Oficio / Legal 21.59 × 35.56 cm (8.5" × 14")' },
+  'A4':               { w: 21,    h: 29.7,  label: 'A4 21 × 29.7 cm (8.27" × 11.69")' },
+  'A4Horizontal':     { w: 29.7,  h: 21,    label: 'A4 Horizontal 29.7 × 21 cm' },
+  'DobleCarta':       { w: 43.18, h: 27.94, label: 'Doble Carta 43.18 × 27.94 cm (17" × 11")' },
+  'Tabloide':         { w: 27.94, h: 43.18, label: 'Tabloide 27.94 × 43.18 cm (11" × 17")' },
+  'FotoInfantil':     { w: 2.5,   h: 3.0,   label: 'Foto infantil 2.5 × 3.0 cm' },
+  'FotoPostal':       { w: 10.2,  h: 15.2,  label: 'Foto Postal 10.2 × 15.2 cm (4" × 6")' },
+  'Foto5x7':          { w: 12.7,  h: 17.8,  label: '12.7 × 17.8 cm (5" × 7")' },
+  'Foto6x8':          { w: 15.24, h: 20.32, label: '15.24 × 20.32 cm (6" × 8")' },
+  'Foto8x10':         { w: 20.32, h: 25.4,  label: '20.32 × 25.4 cm (8" × 10")' }
 };
 
 export const PX_PER_CM = 37.795;
@@ -334,8 +336,8 @@ export function zoomOut() {
 export function zoomFitToScreen() {
   const ws = document.getElementById('workspace');
   if (!ws) return;
-  const availW = ws.clientWidth - 120;
-  const availH = ws.clientHeight - 120;
+  const availW = ws.clientWidth - 140;
+  const availH = ws.clientHeight - 140;
   const fit = Math.min(availW / canvas.width, availH / canvas.height, 1);
   currentZoom = Math.max(fit, 0.1);
   applyZoom();
@@ -373,8 +375,7 @@ function applyZoom() {
   const container = wrapper.querySelector('.canvas-container');
   if (!container) return;
 
-  // Espacio para reglas: 28px arriba y 28px a la izquierda
-  const RULER_SPACE = 28;
+  const RULER_SPACE = 40;
 
   wrapper.style.width = (canvas.width * currentZoom + RULER_SPACE) + 'px';
   wrapper.style.height = (canvas.height * currentZoom + RULER_SPACE) + 'px';
@@ -449,7 +450,7 @@ export function setSheetSize(key, customSize = null) {
   updateCanvasInfo();
 }
 
-// ✅ CAMBIAR TAMAÑO DEL OBJETO SELECCIONADO
+// ===== RESIZE OBJETO =====
 export function resizeActiveObject(widthCm, heightCm, keepRatio = false) {
   const obj = canvas.getActiveObject();
   if (!obj) { alert('Selecciona un objeto primero'); return; }
@@ -481,6 +482,74 @@ export function getActiveObjectSizeCm() {
     w: (obj.width * obj.scaleX) / PX_PER_CM,
     h: (obj.height * obj.scaleY) / PX_PER_CM
   };
+}
+
+// ===== POSICIÓN Y ALINEACIÓN =====
+export function setObjectPosition(xCm, yCm) {
+  const obj = canvas.getActiveObject();
+  if (!obj) return;
+  const bound = obj.getBoundingRect(true, true);
+  const currentLeftPx = bound.left;
+  const currentTopPx = bound.top;
+  const targetLeftPx = xCm * PX_PER_CM;
+  const targetTopPx = yCm * PX_PER_CM;
+
+  obj.set({
+    left: obj.left + (targetLeftPx - currentLeftPx),
+    top: obj.top + (targetTopPx - currentTopPx)
+  });
+  obj.setCoords();
+  canvas.renderAll();
+  updateDimensionOverlay();
+}
+
+export function getObjectPositionCm() {
+  const obj = canvas.getActiveObject();
+  if (!obj) return null;
+  const bound = obj.getBoundingRect(true, true);
+  return {
+    x: bound.left / PX_PER_CM,
+    y: bound.top / PX_PER_CM,
+    w: bound.width / PX_PER_CM,
+    h: bound.height / PX_PER_CM
+  };
+}
+
+export function alignActiveObject(tipo, ref = 'sheet') {
+  const obj = canvas.getActiveObject();
+  if (!obj) { alert('Selecciona un objeto primero'); return; }
+
+  const bound = obj.getBoundingRect(true, true);
+  const objW = bound.width;
+  const objH = bound.height;
+  const objLeft = bound.left;
+  const objTop = bound.top;
+
+  const refLeft = ref === 'margin' ? marginPx : 0;
+  const refTop = ref === 'margin' ? marginPx : 0;
+  const refRight = ref === 'margin' ? canvas.width - marginPx : canvas.width;
+  const refBottom = ref === 'margin' ? canvas.height - marginPx : canvas.height;
+  const refCenterX = (refLeft + refRight) / 2;
+  const refCenterY = (refTop + refBottom) / 2;
+
+  let dx = 0, dy = 0;
+
+  switch (tipo) {
+    case 'left':   dx = refLeft - objLeft; break;
+    case 'center': dx = refCenterX - (objLeft + objW / 2); break;
+    case 'right':  dx = refRight - (objLeft + objW); break;
+    case 'top':    dy = refTop - objTop; break;
+    case 'middle': dy = refCenterY - (objTop + objH / 2); break;
+    case 'bottom': dy = refBottom - (objTop + objH); break;
+  }
+
+  obj.set({
+    left: obj.left + dx,
+    top: obj.top + dy
+  });
+  obj.setCoords();
+  canvas.renderAll();
+  updateDimensionOverlay();
 }
 
 // ===== AGREGAR =====
@@ -746,21 +815,17 @@ export function toggleStrike() { const o = canvas.getActiveObject(); if (o) { o.
 export function setFontFamily(f) { const o = canvas.getActiveObject(); if (o) { o.set('fontFamily', f); canvas.renderAll(); } }
 export function setFontSize(s) { const o = canvas.getActiveObject(); if (o) { o.set('fontSize', s); canvas.renderAll(); } }
 
-// ✅ REDONDEAR ESQUINAS (corregido, sin borrar la imagen)
 export function setCornerRadius(radius) {
   const o = canvas.getActiveObject();
   if (!o) return;
   radius = Math.max(0, Math.min(radius, 100));
 
-  // Si es un Rect nativo, aplicar rx/ry directamente
   if (o.type === 'rect') {
     o.set({ rx: radius, ry: radius });
     canvas.renderAll();
     return;
   }
 
-  // ✅ Para imágenes y otros objetos, usar clipPath RELATIVO al objeto
-  // (sin absolutePositioned, con las dimensiones del objeto)
   if (radius === 0) {
     o.set('clipPath', null);
   } else {
@@ -775,14 +840,13 @@ export function setCornerRadius(radius) {
       originY: 'center',
       left: 0,
       top: 0
-      // NO usar absolutePositioned
     });
     o.set('clipPath', clipRect);
   }
   canvas.renderAll();
 }
 
-// ===== PEGAR DESDE PORTAPAPELES =====
+// ===== PEGAR =====
 export async function pasteFromClipboard() {
   try {
     if (!navigator.clipboard || !navigator.clipboard.read) {

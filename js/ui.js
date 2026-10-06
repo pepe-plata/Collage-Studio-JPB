@@ -18,7 +18,7 @@ export function openPanel(name) {
 
   if (name === 'nuevo') {
     const quiere = confirm(
-      '¿Crear nuevo proyecto?\n\n' +
+      '¿Crear nuevo collage?\n\n' +
       'Se eliminará todo el contenido actual.\n\n' +
       'Aceptar = Nuevo proyecto\n' +
       'Cancelar = Guardar cambios primero'
@@ -60,10 +60,10 @@ export function closePanel() {
 
 function getPanelTitle(name) {
   return {
-    formato: '📐 Cambiar Tamaño de Hoja',
+    formato: '📐 Configurar Página',
+    'proyecto-abrir': '📂 Abrir Proyecto',
     redimensionarObjeto: '📏 Cambiar Tamaño del Objeto',
-    margenes: '📏 Márgenes',
-    fondo: '🖼️ Fondo',
+    fondo: '🖼️ Fondo de Página',
     imagenes: '📷 Insertar Imágenes',
     figuras: '🔷 Figuras geométricas',
     stickers: '⭐ Stickers y emojis',
@@ -73,9 +73,9 @@ function getPanelTitle(name) {
     filtros: '🎞️ Filtros',
     papel: '📜 Efectos de papel',
     mascaras: '🎭 Máscaras',
-    proyecto: '💾 Proyecto',
+    proyecto: '💾 Guardar Proyecto',
     exportar: '📤 Exportar',
-    ayuda: '🆘 Ayuda'
+    ayuda: '🆘 Acerca de'
   }[name] || 'Panel';
 }
 
@@ -85,13 +85,10 @@ function getPanelContent(name) {
       const size = CV.getActiveObjectSizeCm();
       const w = size ? size.w.toFixed(2) : 5;
       const h = size ? size.h.toFixed(2) : 5;
-
-      // ✅ Combo con tamaños predefinidos
       const presets = [
         { key: '', label: '— Personalizado —' },
         ...Object.entries(CV.SHEET_SIZES).map(([key, s]) => ({ key, label: s.label }))
       ];
-
       return `
         <p style="font-size:0.8rem; color:var(--gray); margin-bottom:1rem;">
           Ajusta el tamaño del objeto seleccionado en centímetros.
@@ -118,8 +115,10 @@ function getPanelContent(name) {
       `;
     }
 
+    // ✅ NUEVO: Configurar Página con 2 secciones
     case 'formato':
       return `
+        <div class="panel-section-title">📄 Configurar tamaño de papel</div>
         ${Object.entries(CV.SHEET_SIZES).map(([key, s]) =>
           `<button class="btn ${key === CV.currentKey ? 'success' : 'secondary'}" data-size="${key}">${s.label}</button>`
         ).join('')}
@@ -148,12 +147,10 @@ function getPanelContent(name) {
           </div>
           <button class="btn success" id="btnAplicarCustom">✅ Aplicar tamaño personalizado</button>
         </div>
-      `;
 
-    case 'margenes':
-      return `
+        <div class="panel-section-title">📏 Configurar márgenes</div>
         <p style="font-size:0.8rem; color:var(--gray); margin-bottom:1rem;">
-          Los márgenes definen el área segura del lienzo. Se muestra con una línea punteada.
+          El margen define el área segura del lienzo. Se muestra con una línea punteada.
         </p>
         <div class="form-group">
           <label>Margen (cm): <span id="margenVal">${CV.marginCm}</span></label>
@@ -167,7 +164,18 @@ function getPanelContent(name) {
           <input type="checkbox" id="margenVisible" checked>
           <label for="margenVisible">Mostrar guía visual</label>
         </div>
-        <button class="btn success" id="btnAplicarMargen">✅ Aplicar</button>
+        <button class="btn success" id="btnAplicarMargen">✅ Aplicar margen</button>
+      `;
+
+    case 'proyecto-abrir':
+      return `
+        <p style="font-size:0.85rem; color:var(--gray); margin-bottom:1rem;">
+          Abre un proyecto guardado previamente.
+        </p>
+        <button class="btn success" id="btnAbrirNavegador">📂 Abrir desde navegador</button>
+        <label class="btn secondary">📥 Abrir archivo .json
+          <input type="file" id="inputAbrirProyecto" accept=".json" style="display:none">
+        </label>
       `;
 
     case 'fondo':
@@ -275,8 +283,10 @@ function getPanelContent(name) {
       `;
     }
 
-    // ✅ EFECTOS: sin botones, todo se aplica directamente
-    case 'efectos':
+    case 'efectos': {
+      const pos = CV.getObjectPositionCm();
+      const px = pos ? pos.x.toFixed(2) : '0';
+      const py = pos ? pos.y.toFixed(2) : '0';
       return `
         <div class="form-group">
           <label>Color de relleno / principal</label>
@@ -321,7 +331,44 @@ function getPanelContent(name) {
           <label>Opacidad: <span id="opacidadVal">100</span>%</label>
           <input type="range" id="opacidad" min="0" max="100" value="100">
         </div>
+        <hr style="margin:1rem 0; border:none; border-top:1px solid var(--border);">
+        <div class="form-group">
+          <label>📌 Posición (cm)</label>
+          <div class="row">
+            <div>
+              <label style="font-size:0.7rem; font-weight:400;">X (izq)</label>
+              <input type="number" id="posX" value="${px}" step="0.1">
+            </div>
+            <div>
+              <label style="font-size:0.7rem; font-weight:400;">Y (arr)</label>
+              <input type="number" id="posY" value="${py}" step="0.1">
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>📄 Alinear a la hoja</label>
+          <div class="align-grid">
+            <button data-align="left" data-ref="sheet" title="Izquierda">⬅️</button>
+            <button data-align="center" data-ref="sheet" title="Centro H">↔️</button>
+            <button data-align="right" data-ref="sheet" title="Derecha">➡️</button>
+            <button data-align="top" data-ref="sheet" title="Arriba">⬆️</button>
+            <button data-align="middle" data-ref="sheet" title="Centro V">↕️</button>
+            <button data-align="bottom" data-ref="sheet" title="Abajo">⬇️</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>📏 Alinear a los márgenes</label>
+          <div class="align-grid">
+            <button data-align="left" data-ref="margin" title="Margen izq">⬅️</button>
+            <button data-align="center" data-ref="margin" title="Centro H">↔️</button>
+            <button data-align="right" data-ref="margin" title="Margen der">➡️</button>
+            <button data-align="top" data-ref="margin" title="Margen arr">⬆️</button>
+            <button data-align="middle" data-ref="margin" title="Centro V">↕️</button>
+            <button data-align="bottom" data-ref="margin" title="Margen abj">⬇️</button>
+          </div>
+        </div>
       `;
+    }
 
     case 'filtros':
       return `
@@ -387,7 +434,6 @@ function getPanelContent(name) {
     case 'proyecto':
       return `
         <button class="btn success" id="btnGuardarProyecto">💾 Guardar en navegador</button>
-        <button class="btn" id="btnCargarProyecto">📂 Cargar desde navegador</button>
         <button class="btn danger" id="btnEliminarProyecto">🗑️ Eliminar guardado</button>
         <hr style="margin:1rem 0; border:none; border-top:1px solid var(--border);">
         <button class="btn" id="btnExportarJSON">📤 Exportar archivo .json</button>
@@ -405,7 +451,7 @@ function getPanelContent(name) {
       `;
 
     case 'ayuda':
-      return `<div id="ayudaContenido" style="font-size:0.85rem; line-height:1.6;"><p>Cargando ayuda...</p></div>`;
+      return `<div id="ayudaContenido" style="font-size:0.85rem; line-height:1.6;"><p>Cargando información...</p></div>`;
 
     default:
       return '';
@@ -415,7 +461,6 @@ function getPanelContent(name) {
 function bindPanelEvents(name) {
   const content = document.getElementById('panelContent');
 
-  // ✅ PANEL: redimensionar objeto con combo
   if (name === 'redimensionarObjeto') {
     const wInput = document.getElementById('objW');
     const hInput = document.getElementById('objH');
@@ -424,10 +469,9 @@ function bindPanelEvents(name) {
     let lastW = parseFloat(wInput?.value) || 5;
     let lastH = parseFloat(hInput?.value) || 5;
 
-    // ✅ Al cambiar el combo, aplicar el tamaño predefinido
     preset.onchange = () => {
       const key = preset.value;
-      if (!key) return; // "Personalizado"
+      if (!key) return;
       const size = CV.SHEET_SIZES[key];
       if (!size) return;
       wInput.value = size.w.toFixed(2);
@@ -437,7 +481,7 @@ function bindPanelEvents(name) {
     };
 
     wInput.oninput = () => {
-      preset.value = ''; // resetear combo
+      preset.value = '';
       if (ratioCheck.checked) {
         const ratio = lastH / lastW;
         hInput.value = (parseFloat(wInput.value) * ratio).toFixed(2);
@@ -463,6 +507,7 @@ function bindPanelEvents(name) {
     };
   }
 
+  // ✅ CONFIGURAR PÁGINA (tamaño + márgenes)
   if (name === 'formato') {
     content.querySelectorAll('[data-size]').forEach(btn => {
       btn.onclick = () => {
@@ -509,26 +554,33 @@ function bindPanelEvents(name) {
         closePanel();
       };
     }
-  }
 
-  if (name === 'margenes') {
+    // ✅ Sección de márgenes dentro del mismo panel
     const slider = document.getElementById('margenSlider');
-    const input = document.getElementById('margenInput');
+    const inputM = document.getElementById('margenInput');
     const val = document.getElementById('margenVal');
     const checkbox = document.getElementById('margenVisible');
 
     slider.oninput = () => {
       val.textContent = slider.value;
-      input.value = slider.value;
+      inputM.value = slider.value;
     };
-    input.oninput = () => {
-      val.textContent = input.value;
-      slider.value = input.value;
+    inputM.oninput = () => {
+      val.textContent = inputM.value;
+      slider.value = inputM.value;
     };
     checkbox.onchange = () => CV.toggleMarginGuide(checkbox.checked);
     document.getElementById('btnAplicarMargen').onclick = () => {
-      CV.setMarginCm(parseFloat(input.value) || 0);
+      CV.setMarginCm(parseFloat(inputM.value) || 0);
       alert('✅ Margen aplicado: ' + CV.marginCm + ' cm');
+    };
+  }
+
+  if (name === 'proyecto-abrir') {
+    document.getElementById('btnAbrirNavegador').onclick = PROJ.loadProject;
+    document.getElementById('inputAbrirProyecto').onchange = (e) => {
+      const f = e.target.files[0];
+      if (f) PROJ.importProjectFile(f);
     };
   }
 
@@ -639,7 +691,6 @@ function bindPanelEvents(name) {
     });
   }
 
-  // ✅ EFECTOS: aplicar directamente sin botones
   if (name === 'efectos') {
     const fillColor = document.getElementById('fillColor');
     const fillTransparente = document.getElementById('fillTransparente');
@@ -651,7 +702,6 @@ function bindPanelEvents(name) {
     const sombraTipo = document.getElementById('sombraTipo');
     const opacidad = document.getElementById('opacidad');
 
-    // ✅ Relleno
     fillColor.oninput = () => {
       if (!fillTransparente.checked) CV.setFillColor(fillColor.value);
     };
@@ -661,13 +711,11 @@ function bindPanelEvents(name) {
       else CV.setFillColor(fillColor.value);
     };
 
-    // ✅ Redondear esquinas
     radioSlider.oninput = (e) => {
       document.getElementById('radioVal').textContent = e.target.value;
       CV.setCornerRadius(parseInt(e.target.value));
     };
 
-    // ✅ Borde
     bordeSin.onchange = () => {
       const disabled = bordeSin.checked;
       bordeGrosor.disabled = disabled;
@@ -680,14 +728,33 @@ function bindPanelEvents(name) {
     bordeColor.oninput = () => CV.applyBorder(parseInt(bordeGrosor.value), bordeColor.value, bordeEstilo.value);
     bordeEstilo.onchange = () => CV.applyBorder(parseInt(bordeGrosor.value), bordeColor.value, bordeEstilo.value);
 
-    // ✅ Sombra
     sombraTipo.onchange = () => CV.applyShadow(sombraTipo.value);
 
-    // ✅ Opacidad
     opacidad.oninput = (e) => {
       document.getElementById('opacidadVal').textContent = e.target.value;
       CV.setOpacity(e.target.value / 100);
     };
+
+    const posX = document.getElementById('posX');
+    const posY = document.getElementById('posY');
+    function applyPosition() {
+      const x = parseFloat(posX.value);
+      const y = parseFloat(posY.value);
+      if (!isNaN(x) && !isNaN(y)) CV.setObjectPosition(x, y);
+    }
+    posX.onchange = applyPosition;
+    posY.onchange = applyPosition;
+
+    content.querySelectorAll('[data-align]').forEach(btn => {
+      btn.onclick = () => {
+        CV.alignActiveObject(btn.dataset.align, btn.dataset.ref);
+        const newPos = CV.getObjectPositionCm();
+        if (newPos) {
+          posX.value = newPos.x.toFixed(2);
+          posY.value = newPos.y.toFixed(2);
+        }
+      };
+    });
   }
 
   if (name === 'filtros') {
@@ -730,7 +797,6 @@ function bindPanelEvents(name) {
 
   if (name === 'proyecto') {
     document.getElementById('btnGuardarProyecto').onclick = PROJ.saveProject;
-    document.getElementById('btnCargarProyecto').onclick = PROJ.loadProject;
     document.getElementById('btnEliminarProyecto').onclick = PROJ.deleteProject;
     document.getElementById('btnExportarJSON').onclick = PROJ.exportProjectFile;
     document.getElementById('inputProyecto').onchange = (e) => {
@@ -766,7 +832,7 @@ function bindPanelEvents(name) {
         document.getElementById('ayudaContenido').innerHTML = renderMarkdown(md);
       })
       .catch(() => {
-        document.getElementById('ayudaContenido').innerHTML = '<p>No se pudo cargar la ayuda.</p>';
+        document.getElementById('ayudaContenido').innerHTML = '<p>No se pudo cargar la información.</p>';
       });
   }
 }

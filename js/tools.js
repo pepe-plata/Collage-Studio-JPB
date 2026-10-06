@@ -2,9 +2,20 @@
 // tools.js — Recortar, máscaras, vectores, papel
 // ============================================
 
-import { canvas, addImageFromDataURL } from './canvas.js';
+import { canvas, addImageFromDataURL, PX_PER_CM } from './canvas.js';
 
-// ===== RECORTAR =====
+// ===== RECORTAR (REDISEÑADO) =====
+let cropState = {
+  img: null,
+  imgW: 0,
+  imgH: 0,
+  displayScale: 1,
+  selection: null,
+  fabricCanvas: null,
+  displayW: 0,
+  displayH: 0
+};
+
 export function openCropModal() {
   const obj = canvas.getActiveObject();
   if (!obj || obj.type !== 'image') {
@@ -13,63 +24,258 @@ export function openCropModal() {
   }
 
   const modal = document.getElementById('cropModal');
-  const cropCanvas = document.getElementById('cropCanvas');
-  const ctx = cropCanvas.getContext('2d');
-
-  const maxW = Math.min(window.innerWidth * 0.8, 600);
-  const maxH = window.innerHeight * 0.5;
-  const scale = Math.min(maxW / obj.width, maxH / obj.height, 1);
-
-  cropCanvas.width = obj.width * scale;
-  cropCanvas.height = obj.height * scale;
-  ctx.drawImage(obj._element, 0, 0, cropCanvas.width, cropCanvas.height);
-
   modal.classList.add('show');
-  modal.dataset.scale = scale;
 
-  if (window._cropFabric) window._cropFabric.dispose();
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      setupCropCanvas(obj);
+    });
+  });
+}
 
-  const cropFabric = new fabric.Canvas('cropCanvas', { selection: false });
-  window._cropFabric = cropFabric;
+function setupCropCanvas(obj) {
+  const cropCanvas = document.getElementById('cropCanvas');
+  const wrapper = cropCanvas.parentElement;
 
+  if (cropState.fabricCanvas) {
+    cropState.fabricCanvas.dispose();
+    cropState.fabricCanvas = null;
+  }
+
+  const originalImg = obj._element;
+  const imgW = originalImg.naturalWidth || originalImg.width;
+  const imgH = originalImg.naturalHeight || originalImg.height;
+
+  const wrapperW = wrapper.clientWidth || 600;
+  const wrapperH = wrapper.clientHeight || 400;
+
+  const maxW = Math.min(wrapperW - 20, window.innerWidth * 0.85);
+  const maxH = Math.min(window.innerHeight * 0.55, 500);
+
+  const scale = Math.min(maxW / imgW, maxH / imgH, 1);
+
+  const displayW = Math.max(200, Math.round(imgW * scale));
+  const displayH = Math.max(200, Math.round(imgH * scale));
+
+  cropCanvas.width = displayW;
+  cropCanvas.height = displayH;
+  cropCanvas.style.width = displayW + 'px';
+  cropCanvas.style.height = displayH + 'px';
+
+  cropState.img = originalImg;
+  cropState.imgW = imgW;
+  cropState.imgH = imgH;
+  cropState.displayScale = scale;
+  cropState.displayW = displayW;
+  cropState.displayH = displayH;
+
+  // ✅ Fondo blanco, no negro
+  const fCanvas = new fabric.Canvas('cropCanvas', {
+    backgroundColor: '#ffffff',
+    selection: false,
+    preserveObjectStacking: true
+  });
+  cropState.fabricCanvas = fCanvas;
+
+  // ✅ La imagen se dibuja UNA SOLA VEZ
+  const bgImg = new fabric.Image(originalImg, {
+    left: 0,
+    top: 0,
+    selectable: false,
+    evented: false
+  });
+  bgImg.scaleToWidth(displayW);
+  fCanvas.add(bgImg);
+
+  // ✅ Overlay oscuro (60%) encima de la imagen
+  const darkOverlay = new fabric.Rect({
+    left: 0,
+    top: 0,
+    width: displayW,
+    height: displayH,
+    fill: 'rgba(0,0,0,0.55)',
+    selectable: false,
+    evented: false,
+    excludeFromExport: false
+  });
+  fCanvas.add(darkOverlay);
+
+  // ✅ Frame de recorte interactivo con "agujero" transparente
+  const selW = displayW * 0.7;
+  const selH = displayH * 0.7;
+  const selLeft = (displayW - selW) / 2;
+  const selTop = (displayH - selH) / 2;
+
+  // Rectángulo de selección interactivo (bordes + handles)
   const sel = new fabric.Rect({
-    left: 50, top: 50,
-    width: cropCanvas.width * 0.5,
-    height: cropCanvas.height * 0.5,
-    fill: 'rgba(79,70,229,0.2)',
+    left: selLeft,
+    top: selTop,
+    width: selW,
+    height: selH,
+    fill: 'transparent',
     stroke: '#4f46e5',
     strokeWidth: 2,
-    strokeDashArray: [5, 5],
+    strokeDashArray: [6, 4],
     cornerColor: '#4f46e5',
-    cornerSize: 14,
+    cornerStrokeColor: '#ffffff',
+    cornerSize: 20,
+    cornerStyle: 'circle',
     transparentCorners: false,
+    borderColor: '#4f46e5',
+    borderScaleFactor: 2,
     hasRotatingPoint: false,
-    lockRotation: true
+    lockRotation: true,
+    objectCaching: false
+  });
+  fCanvas.add(sel);
+  fCanvas.setActiveObject(sel);
+  fCanvas.renderAll();
+
+  cropState.selection = sel;
+
+  // ✅ Fondo de la selección (una imagen clonada SIN overlay, con clipPath al rect)
+  // Esto hace que dentro del frame se vea la imagen "iluminada"
+  const clearImg = new fabric.Image(originalImg, {
+    left: 0,
+    top: 0,
+    selectable: false,
+    evented: false,
+    objectCaching: false
+  });
+  clearImg.scaleToWidth(displayW);
+  fCanvas.add(clearImg);
+  fCanvas.sendToBack(clearImg);
+
+  // Reordenar: bgImg (imagen) → darkOverlay → clearImg (recortada) → sel
+  fCanvas.remove(bgImg);
+  fCanvas.add(bgImg);
+  fCanvas.sendToBack(bgImg);
+
+  // Función para actualizar el clipPath del clearImg
+  function updateClear() {
+    const s = cropState.selection;
+    const rectW = s.width * s.scaleX;
+    const rectH = s.height * s.scaleY;
+    const rectL = s.left;
+    const rectT = s.top;
+
+    clearImg.set({
+      left: 0,
+      top: 0,
+      width: displayW,
+      height: displayH,
+      scaleX: 1,
+      scaleY: 1,
+      clipPath: new fabric.Rect({
+        width: rectW,
+        height: rectH,
+        left: rectL,
+        top: rectT,
+        absolutePositioned: true
+      })
+    });
+    clearImg.scaleToWidth(displayW);
+
+    // ✅ Reaplicar clipPath después de escalar
+    clearImg.set('clipPath', new fabric.Rect({
+      width: rectW,
+      height: rectH,
+      left: rectL,
+      top: rectT,
+      absolutePositioned: true
+    }));
+
+    const wCm = (rectW / cropState.displayScale) / PX_PER_CM;
+    const hCm = (rectH / cropState.displayScale) / PX_PER_CM;
+    document.getElementById('cropSize').textContent =
+      `Área seleccionada: ${wCm.toFixed(2)} × ${hCm.toFixed(2)} cm`;
+
+    fCanvas.renderAll();
+  }
+
+  // ✅ Limitar el frame para que no salga de la imagen
+  function limitSelection() {
+    const s = cropState.selection;
+    const rectW = s.width * s.scaleX;
+    const rectH = s.height * s.scaleY;
+
+    // Limitar tamaño máximo
+    const maxW = displayW;
+    const maxH = displayH;
+    const sX = rectW > maxW ? maxW / (s.width) : s.scaleX;
+    const sY = rectH > maxH ? maxH / (s.height) : s.scaleY;
+    if (sX !== s.scaleX || sY !== s.scaleY) {
+      s.set({ scaleX: sX, scaleY: sY });
+    }
+
+    const newW = s.width * s.scaleX;
+    const newH = s.height * s.scaleY;
+
+    // Limitar posición
+    let newLeft = s.left;
+    let newTop = s.top;
+
+    if (newLeft < 0) newLeft = 0;
+    if (newTop < 0) newTop = 0;
+    if (newLeft + newW > displayW) newLeft = displayW - newW;
+    if (newTop + newH > displayH) newTop = displayH - newH;
+
+    s.set({ left: newLeft, top: newTop });
+    s.setCoords();
+  }
+
+  sel.on('moving', () => { limitSelection(); updateClear(); });
+  sel.on('scaling', () => { limitSelection(); updateClear(); });
+  sel.on('modified', () => { limitSelection(); updateClear(); });
+  sel.on('rotating', () => {
+    // Bloquear rotación
+    sel.set('angle', 0);
+    sel.setCoords();
   });
 
-  cropFabric.add(sel);
-  cropFabric.setActiveObject(sel);
-  cropFabric.renderAll();
+  updateClear();
+
+  // Botones
+  document.getElementById('cropCancel').onclick = closeCropModal;
+  document.getElementById('cropApply').onclick = applyCrop;
+  document.getElementById('cropReset').onclick = () => {
+    const s = cropState.selection;
+    const selW2 = cropState.displayW * 0.7;
+    const selH2 = cropState.displayH * 0.7;
+    s.set({
+      left: (cropState.displayW - selW2) / 2,
+      top: (cropState.displayH - selH2) / 2,
+      width: selW2,
+      height: selH2,
+      scaleX: 1,
+      scaleY: 1
+    });
+    s.setCoords();
+    updateClear();
+  };
 }
 
 export function applyCrop() {
   const obj = canvas.getActiveObject();
-  const cropFabric = window._cropFabric;
-  if (!obj || !cropFabric) return;
+  const s = cropState.selection;
+  if (!obj || !s) return;
 
-  const sel = cropFabric.getObjects()[0];
-  const scale = parseFloat(document.getElementById('cropModal').dataset.scale);
+  const rectL = s.left;
+  const rectT = s.top;
+  const rectW = s.width * s.scaleX;
+  const rectH = s.height * s.scaleY;
 
-  const left = sel.left / scale;
-  const top = sel.top / scale;
-  const width = (sel.width * sel.scaleX) / scale;
-  const height = (sel.height * sel.scaleY) / scale;
+  const scale = cropState.displayScale;
+  const origL = rectL / scale;
+  const origT = rectT / scale;
+  const origW = rectW / scale;
+  const origH = rectH / scale;
 
   const tempCanvas = document.createElement('canvas');
-  tempCanvas.width = width;
-  tempCanvas.height = height;
+  tempCanvas.width = origW;
+  tempCanvas.height = origH;
   const ctx = tempCanvas.getContext('2d');
-  ctx.drawImage(obj._element, left, top, width, height, 0, 0, width, height);
+  ctx.drawImage(cropState.img, origL, origT, origW, origH, 0, 0, origW, origH);
 
   const dataURL = tempCanvas.toDataURL('image/png');
   const pos = { left: obj.left, top: obj.top, angle: obj.angle };
@@ -88,10 +294,11 @@ export function applyCrop() {
 
 export function closeCropModal() {
   document.getElementById('cropModal').classList.remove('show');
-  if (window._cropFabric) {
-    window._cropFabric.dispose();
-    window._cropFabric = null;
+  if (cropState.fabricCanvas) {
+    cropState.fabricCanvas.dispose();
+    cropState.fabricCanvas = null;
   }
+  cropState.selection = null;
 }
 
 // ===== MÁSCARAS =====
@@ -155,12 +362,7 @@ export function applyMask(tipo) {
 export function addVectorSticker(tipo) {
   const cx = canvas.width / 2;
   const cy = canvas.height / 2;
-
-  const base = {
-    left: cx, top: cy,
-    originX: 'center', originY: 'center'
-  };
-
+  const base = { left: cx, top: cy, originX: 'center', originY: 'center' };
   let sticker;
 
   switch (tipo) {
@@ -210,12 +412,7 @@ export function addVectorSticker(tipo) {
 export function addPaperEffect(tipo) {
   const cx = canvas.width / 2;
   const cy = canvas.height / 2;
-
-  const base = {
-    left: cx, top: cy,
-    originX: 'center', originY: 'center'
-  };
-
+  const base = { left: cx, top: cy, originX: 'center', originY: 'center' };
   let effect;
 
   switch (tipo) {
